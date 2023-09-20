@@ -118,13 +118,7 @@ class Video(object):
 
     def from_frames(self, path):
         frames_path = sorted([os.path.join(path, x) for x in os.listdir(path)])
-        frames = [imageio.imread(frame_path) for frame_path in frames_path]
-
-
-
-
-
-
+        frames = [imageio.imread(frame_path) for frame_path in frames_path if '.DS_Store' not in frame_path]
         self.handle_type(frames)
         return self
 

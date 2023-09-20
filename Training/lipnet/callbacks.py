@@ -9,7 +9,7 @@ import os
 
 class Statistics(keras.callbacks.Callback):
 
-    def __init__(self, model_container, generator, decoder, num_samples_stats=256, output_dir=None):
+    def __init__(self, model_container, generator, decoder, num_samples_stats=95, output_dir=None):
         self.model_container = model_container
         self.output_dir = output_dir
         self.generator = generator
@@ -106,7 +106,7 @@ class Visualize(keras.callbacks.Callback):
         output_batch = next(self.generator)[0]
 
         y_pred = self.model_container.predict(output_batch['the_input'][0:self.num_display_sentences])
-        print("YPREDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD")
+        print("YPRED")
         print(y_pred)
         input_length = output_batch['input_length'][0:self.num_display_sentences]
         res = self.decoder.decode(y_pred, input_length)

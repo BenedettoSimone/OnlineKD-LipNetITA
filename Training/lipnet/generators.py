@@ -261,6 +261,7 @@ class BasicGenerator(keras.callbacks.Callback):
 # datasets/video/<sid>/<id>/<image>.png
 # or datasets/[train|val]/<sid>/<id>.mpg
 # datasets/align/<id>.align
+'''
 class RandomSplitGenerator(BasicGenerator):
     def build(self, **kwargs):
         self.video_path = os.path.join(self.dataset_path, 'video')
@@ -294,3 +295,4 @@ class RandomSplitGenerator(BasicGenerator):
         print("Found {} videos for training.".format(self.training_size))
         print("Found {} videos for validation.".format(self.validation_size))
         print("")
+'''

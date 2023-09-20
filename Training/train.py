@@ -49,7 +49,7 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
 
     # load weights
     if start_epoch == 0:
-        start_file_w = os.path.join(OUTPUT_DIR,'startWeight/overlappedstartweight.h5')
+        start_file_w = os.path.join(OUTPUT_DIR,'startWeight/unseen-weights178.h5')
         lipnet.model.load_weights(start_file_w)
 
 
@@ -63,7 +63,7 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
                       postprocessors=[labels_to_text, spell.sentence])
 
     # define callbacks
-    statistics  = Statistics(lipnet, lip_gen.next_val(), decoder, 256, output_dir=os.path.join(OUTPUT_DIR, run_name))
+    statistics  = Statistics(lipnet, lip_gen.next_val(), decoder, 95, output_dir=os.path.join(OUTPUT_DIR, run_name))
     visualize   = Visualize(os.path.join(OUTPUT_DIR, run_name), lipnet, lip_gen.next_val(), decoder, num_display_sentences=minibatch_size)
     tensorboard = TensorBoard(log_dir=os.path.join(LOG_DIR, run_name))
     csv_logger  = CSVLogger(os.path.join(LOG_DIR, "{}-{}.csv".format('training',run_name)), separator=',', append=True)

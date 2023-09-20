@@ -12,7 +12,7 @@ class Align(object):
         align = [(int(y[0]) / 1000, int(y[1]) / 1000, y[2]) for y in [x.strip().split(" ") for x in lines]]
 
         self.build(align)
-        print(align)
+        #print(align)
         return self
 
     def from_array(self, align):
@@ -25,10 +25,10 @@ class Align(object):
         self.label = self.get_label(self.sentence)
         self.padded_label = self.get_padded_label(self.label)
 
-        print("ALIGN", self.align)
-        print("SENTENCE", self.sentence)
-        print("LABEL", self.label)
-        print("PADDED_LABEL", self.padded_label)
+        #print("ALIGN", self.align)
+        #print("SENTENCE", self.sentence)
+        #print("LABEL", self.label)
+        #print("PADDED_LABEL", self.padded_label)
 
     def strip(self, align, items):
         return [sub for sub in align if sub[2] not in items]
@@ -40,10 +40,7 @@ class Align(object):
         return self.label_func(sentence)
 
     def get_padded_label(self, label):
-        print(self.absolute_max_string_len)
-        print(len(label))
         padding = np.ones((self.absolute_max_string_len - len(label))) * -1
-        print(padding)
         return np.concatenate((np.array(label), padding), axis=0)
 
     @property
