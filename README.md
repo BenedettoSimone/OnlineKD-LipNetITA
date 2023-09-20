@@ -162,6 +162,37 @@ In the ``Training Vanilla`` section, we will explore how to train the LipNet mod
 
 Next, in the section ``Training with Knowledge Distillation`` we will explore how to train the LipNet model using the proposed KD framework.
 
+If you are using a new dataset, please refer to the FAQ section to change the parameters.
+
 ### 3.1 Training Vanilla
 
 ### 3.1 Training with Knowledge Distillation
+
+
+
+## FAQ
+<details>
+    <summary>What do the parameters "absolute_max_string_len" and "output_size" mean?</summary>
+
+These parameters appear in the scripts ``model.py`` and in ``train.py``.
+
+```python
+# model.py script
+
+class LipNet(object):
+    def __init__(self, img_c=3, img_w=100, img_h=50, frames_n=100, absolute_max_string_len=54, output_size=28):
+        pass
+```
+
+```python
+# train.py script
+
+def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, absolute_max_string_len, minibatch_size):
+    pass
+```
+**absolute_max_string_len**: is the maximum length of the sentences, including spaces, in the dataset. In the dataset used:  len (purtroppo non lo so pero potresti chiedere all autista) = 54
+
+**output_size**: is the number of letters in the alphabet (26) + blank + space = 28.
+
+
+</details>
