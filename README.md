@@ -155,3 +155,13 @@ After, execute the script ``MouthExtract/mouth_extract.py`` that return ``100 fr
 Finally, split this folder in ``Training/datasets/train`` and ``Training/datasets/val`` using 80% for training phase and 20% for validation phase.
 
 
+## 3. Training
+In the previous section, we examined how to build our Italian dataset. Now, we will focus on the training process of the LipNet model, dividing it into two main sections: the ``Training Vanilla`` and the ``Training with Knowledge Distillation``.
+
+In the ``Training Vanilla`` section, we will explore how to train the LipNet model using the traditional approach without the use of Knowledge Distillation. This will provide us a basis for comparison to evaluate the performance of the model after the implementation of Knowledge Distillation.
+
+Next, in the section ``Training with Knowledge Distillation`` we will explore how to train the LipNet model using the proposed KD framework.
+
+### 3.1 Training Vanilla
+
+### 3.1 Training with Knowledge Distillation
