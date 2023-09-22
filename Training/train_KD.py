@@ -29,27 +29,24 @@ PREDICT_DICTIONARY  = os.path.join(CURRENT_PATH,'dictionaries','phrases.txt')
 def curriculum_rules(epoch):
     return { 'sentence_length': -1, 'flip_probability': 0.5, 'jitter_probability': 0.05 }
 
-
-def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, absolute_max_string_len, minibatch_size):
+def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, absolute_max_string_len, minibatch_size, peer_networks_n):
     curriculum = Curriculum(curriculum_rules)
     lip_gen = BasicGenerator(dataset_path=DATASET_DIR,
-                                minibatch_size=minibatch_size,
-                                img_c=img_c, img_w=img_w, img_h=img_h, frames_n=frames_n,
-                                absolute_max_string_len=absolute_max_string_len,
-                                curriculum=curriculum, start_epoch=start_epoch).build()
+                             minibatch_size=minibatch_size,
+                             img_c=img_c, img_w=img_w, img_h=img_h, frames_n=frames_n,
+                             absolute_max_string_len=absolute_max_string_len,
+                             curriculum=curriculum, start_epoch=start_epoch, is_val=True).build()
 
     lipnet = LipNet(img_c=img_c, img_w=img_w, img_h=img_h, frames_n=frames_n,
-                            absolute_max_string_len=absolute_max_string_len, output_size=lip_gen.get_output_size())
+                    absolute_max_string_len=absolute_max_string_len, output_size=lip_gen.get_output_size())
     lipnet.summary()
 
     adam = Adam(lr=0.0001, beta_1=0.9, beta_2=0.999, epsilon=1e-08)
-
-    # the loss calc occurs elsewhere, so use a dummy lambda func for the loss
     lipnet.model.compile(loss={'ctc': lambda y_true, y_pred: y_pred}, optimizer=adam)
 
     # load weights
     if start_epoch == 0:
-        start_file_w = os.path.join(OUTPUT_DIR,'startWeight/unseen-weights178.h5')
+        start_file_w = os.path.join(OUTPUT_DIR, 'startWeight/unseen-weights178.h5')
         lipnet.model.load_weights(start_file_w)
 
     # load preexisting trained weights for the model
@@ -62,22 +59,36 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
                       postprocessors=[labels_to_text, spell.sentence])
 
     # define callbacks
-    statistics  = Statistics(lipnet, lip_gen.next_val(), decoder, 95, output_dir=os.path.join(OUTPUT_DIR, run_name))
-    visualize   = Visualize(os.path.join(OUTPUT_DIR, run_name), lipnet, lip_gen.next_val(), decoder, num_display_sentences=minibatch_size)
-    tensorboard = TensorBoard(log_dir=os.path.join(LOG_DIR, run_name))
-    csv_logger  = CSVLogger(os.path.join(LOG_DIR, "{}-{}.csv".format('training',run_name)), separator=',', append=True)
-    checkpoint  = ModelCheckpoint(os.path.join(OUTPUT_DIR, run_name, "weights{epoch:02d}.h5"), monitor='val_loss', save_weights_only=True, mode='auto', period=1)
+    statistics = Statistics(lipnet, lip_gen.next_val(), decoder, 95, output_dir=os.path.join(OUTPUT_DIR, run_name))
+    visualize = Visualize(os.path.join(OUTPUT_DIR, run_name), lipnet, lip_gen.next_val(), decoder,
+                          num_display_sentences=minibatch_size)
 
-    lipnet.model.fit_generator(generator=lip_gen.next_train(),
-                        steps_per_epoch=lip_gen.default_training_steps, epochs=stop_epoch,
-                        validation_data=lip_gen.next_val(), validation_steps=lip_gen.default_validation_steps,
-                        callbacks=[checkpoint, statistics, visualize, lip_gen, tensorboard, csv_logger],
-                        initial_epoch=start_epoch,
-                        verbose=1,
-                        max_q_size=5,
-                        workers=2,
+    # Training
+    for epoch in range(start_epoch, stop_epoch):
+        print("Epoch {}/{}".format(epoch + 1, stop_epoch))
 
-                        use_multiprocessing=False)
+        n = 0
+        # int(lip_gen.default_training_steps)
+        for batch in range(1):
+            print("Batch {}/{}".format(n, int(lip_gen.default_training_steps)))
+            x_train, y_train = next(lip_gen.next_train())
+            loss = lipnet.model.train_on_batch(x_train, y_train)
+            n = n+1
+
+        val_loss = 0.0
+        num_val_batches = int(lip_gen.default_validation_steps)
+        for batch in range(1):
+            x_val, y_val = next(lip_gen.next_val())
+            val_loss += lipnet.model.evaluate(x_val, y_val, verbose=0)
+
+        val_loss /= num_val_batches
+        print("Epoch {} - Loss: {} - Val Loss: {}".format(epoch + 1, loss, val_loss))
+
+        lipnet.model.save_weights(os.path.join(OUTPUT_DIR, run_name, "weights{:02d}_peer_{:02d}.h5".format(epoch, 1)))
+        statistics.on_epoch_end(epoch)
+        visualize.on_epoch_end(epoch)
+
+
 
 if __name__ == '__main__':
     run_name = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
@@ -90,4 +101,5 @@ if __name__ == '__main__':
     # 7th parameter - frames_n
     # 8th parameter - absolute_max_string_length (max len of sentences)
     # 9th parameter - minibatch_size
-    train(run_name, 0, 10, 3, 100, 50, 100, 54, 19)
+    # 10th parameter - number of peer network
+    train(run_name, 0, 10, 3, 100, 50, 100, 54, 19, 3)

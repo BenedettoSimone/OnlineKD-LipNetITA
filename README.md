@@ -11,6 +11,7 @@ This repository is dedicated to my Master's thesis project, in which I will impl
 
 ## Prerequisites
 - Python 3.6.6
+- [ffmpeg](https://www.ffmpeg.org)
 
 ## 1. Getting started
 In this section, we will first examine how to install and run the vanilla version of LipNet. Next, we will explore the version with Online KD.
