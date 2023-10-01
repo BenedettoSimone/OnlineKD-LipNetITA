@@ -1,24 +1,45 @@
-from wer import wer_sentence
-from nltk.translate import bleu_score
+"""
+This module defines two custom callback classes for evaluating and visualizing model performance during training.
+"""
+
+import os
+import csv
 import numpy as np
 import editdistance
 import keras
-import csv
-import os
+from wer import wer_sentence
+from nltk.translate import bleu_score
 
 
 class Statistics(keras.callbacks.Callback):
+    """
+    A custom callback class for calculating and logging statistics during model training.
+
+    Args:
+        model_container (object): Keras model used for prediction.
+        generator (object): Data generator used for model training.
+        decoder (object): Decoder used for decoding model predictions.
+        num_samples_stats (int): Number of samples for statistics evaluation.
+        output_dir (str): Directory where statistics results will be saved (optional).
+    """
 
     def __init__(self, model_container, generator, decoder, num_samples_stats=95, output_dir=None):
+        """
+        Initializes an instance of Statistics with the specified parameters.
+        """
         self.model_container = model_container
         self.output_dir = output_dir
         self.generator = generator
         self.num_samples_stats = num_samples_stats
         self.decoder = decoder
+        self.batches_results = []
         if output_dir is not None and not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
 
     def get_statistics(self, num):
+        """
+        Compute CER, WER and BLEU metrics.
+        """
         num_left = num
         data = []
 
@@ -68,13 +89,35 @@ class Statistics(keras.callbacks.Callback):
         return self.get_mean_tuples(wrapped_data, 1.0, bleu_score.sentence_bleu)
 
     def on_train_begin(self, logs={}):
+        """
+        Callback called at the beginning of model training to initialize statistics logging.
+        """
         with open(os.path.join(self.output_dir, 'stats.csv'), 'w') as csvfile:
             csvw = csv.writer(csvfile)
             csvw.writerow(
                 ["Epoch", "Samples", "Mean CER", "Mean CER (Norm)", "Mean WER", "Mean WER (Norm)", "Mean BLEU",
                  "Mean BLEU (Norm)"])
 
+    def on_batch_end(self, batch, logs=None):
+        """
+        Callback called at the end of each batch during model training to save batch results for KD attention.
+        """
+
+        y_pred = self.model_container.predict(batch['the_input'])
+        input_length = batch['input_length']
+        decoded_res = self.decoder.decode(y_pred, input_length)
+
+        # save decoded results in dedicated array to compute
+        # useful metrics for KD attention
+        for j in range(len(decoded_res)):
+            self.batches_results.append((decoded_res[j], batch['source_str'][j]))
+
+        return y_pred
+
     def on_epoch_end(self, epoch, logs={}):
+        """
+        Callback called at the end of each epoch during model training to compute and log statistics.
+        """
         stats = self.get_statistics(self.num_samples_stats)
 
         print(('\n\n[Epoch %d] Out of %d samples: [CER: %.3f - %.3f] [WER: %.3f - %.3f] [BLEU: %.3f - %.3f]\n'
@@ -90,8 +133,23 @@ class Statistics(keras.callbacks.Callback):
                                "{0:.5f}".format(stats['wer'][0]), "{0:.5f}".format(stats['wer'][1]),
                                "{0:.5f}".format(stats['bleu'][0]), "{0:.5f}".format(stats['bleu'][1])])
 
+        mean_bleu, mean_bleu_norm = self.get_mean_bleu_score(self.batches_results)
+        self.batches_results = []
+
+        return mean_bleu, mean_bleu_norm
+
 
 class Visualize(keras.callbacks.Callback):
+    """
+    A custom callback class for visualizing and saving results during model training.
+
+    Args:
+        output_dir (str): Directory where visualized results will be saved.
+        model_container (object): Keras model used for prediction.
+        generator (object): Data generator used for model training.
+        decoder (object): Decoder used for decoding model predictions.
+        num_display_sentences (int): Number of sentences to display and save after each epoch.
+    """
 
     def __init__(self, output_dir, model_container, generator, decoder, num_display_sentences=10):
         self.model_container = model_container
@@ -106,11 +164,8 @@ class Visualize(keras.callbacks.Callback):
         output_batch = next(self.generator)[0]
 
         y_pred = self.model_container.predict(output_batch['the_input'][0:self.num_display_sentences])
-        print("YPRED")
-        print(y_pred)
         input_length = output_batch['input_length'][0:self.num_display_sentences]
         res = self.decoder.decode(y_pred, input_length)
-        print(res)
 
         with open(os.path.join(self.output_dir, 'e%02d.csv' % (epoch)), 'w') as csvfile:
             csvw = csv.writer(csvfile)
