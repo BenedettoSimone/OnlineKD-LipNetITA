@@ -13,5 +13,3 @@ Pillow==8.4.0
 tensorflow==1.10.0
 sk-video==1.1.10
 h5py==2.10.0
-
-

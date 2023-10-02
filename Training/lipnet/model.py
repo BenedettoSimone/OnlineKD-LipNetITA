@@ -75,5 +75,10 @@ class LipNet(object):
 
     @property
     def test_function(self):
-        # captures output of softmax so we can decode the output during visualization
+        # captures output of softmax to decode the output during visualization
         return K.function([self.input_data, K.learning_phase()], [self.y_pred, K.learning_phase()])
+
+    @property
+    def logits_function(self):
+        # create a Keras function to compute the logits
+        return K.function([self.input_data, K.learning_phase()], [self.dense1])
