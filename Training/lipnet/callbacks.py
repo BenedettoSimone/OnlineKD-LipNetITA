@@ -112,7 +112,11 @@ class Statistics(keras.callbacks.Callback):
         for j in range(len(decoded_res)):
             self.batches_results.append((decoded_res[j], batch['source_str'][j]))
 
-        return y_pred
+        # TODO optimize code: array unuseful
+        mean_bleu, mean_bleu_norm = self.get_mean_bleu_score(self.batches_results)
+        self.batches_results = []
+
+        return y_pred, mean_bleu, mean_bleu_norm
 
     def on_epoch_end(self, epoch, logs={}):
         """
@@ -132,11 +136,6 @@ class Statistics(keras.callbacks.Callback):
                                "{0:.5f}".format(stats['cer'][0]), "{0:.5f}".format(stats['cer'][1]),
                                "{0:.5f}".format(stats['wer'][0]), "{0:.5f}".format(stats['wer'][1]),
                                "{0:.5f}".format(stats['bleu'][0]), "{0:.5f}".format(stats['bleu'][1])])
-
-        mean_bleu, mean_bleu_norm = self.get_mean_bleu_score(self.batches_results)
-        self.batches_results = []
-
-        return mean_bleu, mean_bleu_norm
 
 
 class Visualize(keras.callbacks.Callback):

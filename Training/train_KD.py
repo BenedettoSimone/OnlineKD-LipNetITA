@@ -68,72 +68,67 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
     # Training
     for epoch in range(start_epoch, stop_epoch):
 
+        print("Epoch {}/{}".format(epoch + 1, stop_epoch))
+
+        # For each batch we train simultaneously n students
+
+        b = 0
         students_weights = []
         students_predictions = []
 
-        print("Epoch {}/{}".format(epoch + 1, stop_epoch))
+        for batch in range(int(lip_gen.default_training_steps)):
+            print("Batch {}/{}".format(b, int(lip_gen.default_training_steps)))
 
-        for n, lipnet in enumerate(peer_networks_list):
-            print("Student: {}".format(n))
+            x_train, y_train = next(lip_gen.next_train())
 
-            # define callbacks
-            # TODO set 95
-            statistics = Statistics(lipnet, lip_gen.next_val(), decoder, 5,
-                                    output_dir=os.path.join(OUTPUT_DIR, run_name))
-            visualize = Visualize(os.path.join(OUTPUT_DIR, run_name), lipnet, lip_gen.next_val(), decoder,
-                                  num_display_sentences=minibatch_size)
+            # train all students on the same batch
+            for n, lipnet in enumerate(peer_networks_list):
+                print("Student: {}".format(n))
 
-            b = 0
-            # int(lip_gen.default_training_steps)
-            # TODO set default training steps
-            for batch in range(2):
-                print("Batch {}/{}".format(b, int(lip_gen.default_training_steps)))
-                x_train, y_train = next(lip_gen.next_train())
+                # define callbacks
+                # TODO set 95 number of validation samples
+                statistics = Statistics(lipnet, lip_gen.next_val(), decoder, 5,
+                                        output_dir=os.path.join(OUTPUT_DIR, run_name))
+                visualize = Visualize(os.path.join(OUTPUT_DIR, run_name), lipnet, lip_gen.next_val(), decoder,
+                                      num_display_sentences=minibatch_size)
+
                 loss = lipnet.model.train_on_batch(x_train, y_train)
 
-                # TODO make prediction on validation data
-                # make prediction on current batch, decode results and save them to compute at the end of each epoch
+                print("Loss: {}".format(loss))
+                # make prediction on current batch, decode results and save them to compute
                 # metrics useful to perform KD attention
-                y_pred = statistics.on_batch_end(x_train)
+                y_pred, mean_bleu, mean_bleu_norm = statistics.on_batch_end(x_train)
 
-                # Check if there are existing predictions for the current student
-                # The result of this step for each student is (number_of_student, array(pred))
-                existing_student_index = [i for i, pred in enumerate(students_predictions) if pred[0] == n]
-                print(existing_student_index)
-                if existing_student_index:
-                    # Save predictions to existing student predictions
-                    students_predictions[existing_student_index[0]] = (
-                        n, np.concatenate((students_predictions[existing_student_index[0]][1], y_pred), axis=0))
-                else:
-                    students_predictions.append((n, y_pred))
+                # TODO check normalization of weights
+                students_predictions.append((n, y_pred))
+                students_weights.append(mean_bleu_norm)
 
-                b = b + 1
+            # At the end of each batch compute ensemble output
+            ensemble_predictions = []
 
-            # For each student compute metrics (weights) useful to KD attention
-            mean_bleu, mean_bleu_norm = statistics.on_epoch_end(epoch)
+            # Get how many predictions
+            for i in range(students_predictions[0][1].shape[0]):
+                weighted_predictions = []
+                for student_idx, pred in students_predictions:
+                    # Multiply each matrix 100x28 for the student weight
+                    weighted_predictions.append(pred[i] * students_weights[student_idx])
 
-            # TODO save weights
-            # TODO use callback Visualize
-            students_weights.append(mean_bleu_norm)
+                # For each sample (i.e. pred1 of s1, pred1 of s2, pred1 of s3)
+                # pred * w1 + pred * w2 + pred * w3
+                ensemble_prediction = np.sum(weighted_predictions, axis=0)
+                ensemble_predictions.append(ensemble_prediction)
 
-        # TODO check normalization of weights
+            ensemble_predictions = np.array(ensemble_predictions)
 
-        # At the end of each epoch compute ensemble output
-        ensemble_predictions = []
+            b = b + 1
 
-        # Get how many predictions
-        for i in range(students_predictions[0][1].shape[0]):
-            weighted_predictions = []
-            for student_idx, pred in students_predictions:
-                # Multiply each matrix 100x28 for the student weight
-                weighted_predictions.append(pred[i] * students_weights[student_idx])
+        # Save model weights every 5 epochs
+        # if (epoch + 1) % 5 == 0:
+        #   lipnet.model.save_weights(
+        #      os.path.join(OUTPUT_DIR, run_name, "weights{:02d}_peer_{:02d}.h5".format(epoch, n)))
 
-            # For each sample (i.e. pred1 of s1, pred1 of s2, pred1 of s3)
-            # pred * w1 + pred * w2 + pred * w3
-            ensemble_prediction = np.sum(weighted_predictions, axis=0)
-            ensemble_predictions.append(ensemble_prediction)
-
-        ensemble_predictions = np.array(ensemble_predictions)
+        # statistics.on_epoch_end(epoch)
+        # visualize.on_epoch_end(epoch)
 
 
 if __name__ == '__main__':
