@@ -1,5 +1,7 @@
 import sys, os
 
+from keras.layers import Lambda
+
 CURRENT_PATH = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, CURRENT_PATH)
 
@@ -15,6 +17,8 @@ from lipnet.spell import Spell
 from lipnet.model import LipNet
 import numpy as np
 import datetime
+import keras.backend as K
+import tensorflow as tf
 
 np.random.seed(55)
 
@@ -29,6 +33,7 @@ PREDICT_DICTIONARY = os.path.join(CURRENT_PATH, 'dictionaries', 'phrases.txt')
 
 def curriculum_rules(epoch):
     return {'sentence_length': -1, 'flip_probability': 0.5, 'jitter_probability': 0.05}
+
 
 
 def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, absolute_max_string_len, minibatch_size,
@@ -73,9 +78,9 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
         # For each batch we train simultaneously n students
 
         b = 0
-        students_weights = []
-        students_predictions = []
-
+        student_weights = []
+        student_predictions = []
+        student_losses = []
         for batch in range(int(lip_gen.default_training_steps)):
             print("Batch {}/{}".format(b, int(lip_gen.default_training_steps)))
 
@@ -92,26 +97,27 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
                 visualize = Visualize(os.path.join(OUTPUT_DIR, run_name), lipnet, lip_gen.next_val(), decoder,
                                       num_display_sentences=minibatch_size)
 
-                loss = lipnet.model.train_on_batch(x_train, y_train)
+                student_ctc_loss = lipnet.model.train_on_batch(x_train, y_train)
 
-                print("Loss: {}".format(loss))
+                print("Loss: {}".format(student_ctc_loss))
                 # make prediction on current batch, decode results and save them to compute
                 # metrics useful to perform KD attention
                 y_pred, mean_bleu, mean_bleu_norm = statistics.on_batch_end(x_train)
 
                 # TODO check normalization of weights
-                students_predictions.append((n, y_pred))
-                students_weights.append(mean_bleu_norm)
-
+                student_predictions.append((n, y_pred))
+                student_weights.append(mean_bleu_norm)
+                student_losses.append(student_ctc_loss)
+            '''
             # At the end of each batch compute ensemble output
             ensemble_predictions = []
 
             # Get how many predictions
-            for i in range(students_predictions[0][1].shape[0]):
+            for i in range(student_predictions[0][1].shape[0]):
                 weighted_predictions = []
-                for student_idx, pred in students_predictions:
+                for student_idx, pred in student_predictions:
                     # Multiply each matrix 100x28 for the student weight
-                    weighted_predictions.append(pred[i] * students_weights[student_idx])
+                    weighted_predictions.append(pred[i] * student_weights[student_idx])
 
                 # For each sample (i.e. pred1 of s1, pred1 of s2, pred1 of s3)
                 # pred * w1 + pred * w2 + pred * w3
@@ -119,13 +125,30 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
                 ensemble_predictions.append(ensemble_prediction)
 
             ensemble_predictions = np.array(ensemble_predictions)
+            '''
+            # TODO Build multi-loss function
+
+            # L = CTC loss ensemble predictions and truth + sum(1,N)[(CTC loss student predictions(i) and truth)+
+            # (LDK divergence students predictions(i) and ensemble predictions)
+
+            # CTC loss between ensemble predictions and truth
+            #ctc_ensemble = compute_ctc_loss(ensemble_predictions, x_train)
+
+            # CTC loss between students predictions and truth
+            # Already in student_losses array
+            multiloss = 307.5454545
+
+            # LDK divergence between students predictions and ensemble predictions
+
+
 
             b = b + 1
 
         # Save model weights every 5 epochs
-        # if (epoch + 1) % 5 == 0:
-        #   lipnet.model.save_weights(
-        #      os.path.join(OUTPUT_DIR, run_name, "weights{:02d}_peer_{:02d}.h5".format(epoch, n)))
+        #if (epoch + 1) % 5 == 0:
+         #   for n, lipnet in enumerate(peer_networks_list):
+          #      lipnet.model.save_weights(
+           #         os.path.join(OUTPUT_DIR, run_name, "weights{:02d}_peer_{:02d}.h5".format(epoch, n)))
 
         # statistics.on_epoch_end(epoch)
         # visualize.on_epoch_end(epoch)
