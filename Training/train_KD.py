@@ -1,13 +1,10 @@
 import sys, os
 
-from keras.layers import Lambda
-
 CURRENT_PATH = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, CURRENT_PATH)
 
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
-from keras.optimizers import Adam
 from lipnet.generators import BasicGenerator
 from lipnet.callbacks import Statistics, Visualize
 from lipnet.curriculums import Curriculum
@@ -17,8 +14,8 @@ from lipnet.spell import Spell
 from lipnet.model import LipNet
 import numpy as np
 import datetime
-import keras.backend as K
 import tensorflow as tf
+from lipnet.layers import ctc_lambda_func
 
 np.random.seed(55)
 
@@ -37,7 +34,7 @@ def curriculum_rules(epoch):
 
 
 def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, absolute_max_string_len, minibatch_size,
-          peer_networks_n):
+          num_samples_stats, peer_networks_n):
     curriculum = Curriculum(curriculum_rules)
     lip_gen = BasicGenerator(dataset_path=DATASET_DIR,
                              minibatch_size=minibatch_size,
@@ -45,14 +42,16 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
                              absolute_max_string_len=absolute_max_string_len,
                              curriculum=curriculum, start_epoch=start_epoch, is_val=True).build()
 
+    adam = tf.keras.optimizers.Adam(learning_rate=0.0001, beta_1=0.9, beta_2=0.999, epsilon=1e-08)
+
     peer_networks_list = []
+
     for n in range(peer_networks_n):
         lipnet = LipNet(img_c=img_c, img_w=img_w, img_h=img_h, frames_n=frames_n,
                         absolute_max_string_len=absolute_max_string_len, output_size=lip_gen.get_output_size())
         lipnet.summary()
 
-        adam = Adam(lr=0.0001, beta_1=0.9, beta_2=0.999, epsilon=1e-08)
-        lipnet.model.compile(loss={'ctc': lambda y_true, y_pred: y_pred}, optimizer=adam)
+        #adam = tf.keras.optimizers.Adam(learning_rate=0.0001, beta_1=0.9, beta_2=0.999, epsilon=1e-08)
 
         # load weights
         if start_epoch == 0:
@@ -81,7 +80,9 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
         student_weights = []
         student_predictions = []
         student_losses = []
-        for batch in range(int(lip_gen.default_training_steps)):
+
+        # TODO set int(lip_gen.default_training_steps)
+        for batch in range(1):
             print("Batch {}/{}".format(b, int(lip_gen.default_training_steps)))
 
             x_train, y_train = next(lip_gen.next_train())
@@ -91,24 +92,36 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
                 print("Student: {}".format(n))
 
                 # define callbacks
-                # TODO set 95 number of validation samples
-                statistics = Statistics(lipnet, lip_gen.next_val(), decoder, 5,
+                statistics = Statistics(lipnet, lip_gen.next_val(), decoder, num_samples_stats,
                                         output_dir=os.path.join(OUTPUT_DIR, run_name))
                 visualize = Visualize(os.path.join(OUTPUT_DIR, run_name), lipnet, lip_gen.next_val(), decoder,
                                       num_display_sentences=minibatch_size)
 
-                student_ctc_loss = lipnet.model.train_on_batch(x_train, y_train)
+                with tf.GradientTape() as tape:
 
-                print("Loss: {}".format(student_ctc_loss))
+                    # Forward pass
+                    # this result is a set of prob + losses
+                    y_pred = lipnet.model(x_train, training=True)
+
+                    print("Loss: {}".format(y_pred[1]))
+
+                    # Compute the mean CTC loss
+                    student_ctc_loss = tf.reduce_mean(y_pred[1], axis=0)
+
+                student_predictions.append((n, y_pred[0]))
+                student_losses.append(student_ctc_loss)
+
                 # make prediction on current batch, decode results and save them to compute
                 # metrics useful to perform KD attention
-                y_pred, mean_bleu, mean_bleu_norm = statistics.on_batch_end(x_train)
 
+                # TODO modify this method
+                #y_pred, mean_bleu, mean_bleu_norm = statistics.on_batch_end(x_train)
                 # TODO check normalization of weights
-                student_predictions.append((n, y_pred))
-                student_weights.append(mean_bleu_norm)
-                student_losses.append(student_ctc_loss)
-            '''
+                # student_weights.append(mean_bleu_norm)
+                student_weights = []
+                student_weights.append(0.4)
+                student_weights.append(0.6)
+
             # At the end of each batch compute ensemble output
             ensemble_predictions = []
 
@@ -116,30 +129,43 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
             for i in range(student_predictions[0][1].shape[0]):
                 weighted_predictions = []
                 for student_idx, pred in student_predictions:
-                    # Multiply each matrix 100x28 for the student weight
+
+                    # Multiply each tensor for the student weight
                     weighted_predictions.append(pred[i] * student_weights[student_idx])
 
                 # For each sample (i.e. pred1 of s1, pred1 of s2, pred1 of s3)
                 # pred * w1 + pred * w2 + pred * w3
+                # Sum each student tensor
                 ensemble_prediction = np.sum(weighted_predictions, axis=0)
                 ensemble_predictions.append(ensemble_prediction)
 
             ensemble_predictions = np.array(ensemble_predictions)
-            '''
+
+
             # TODO Build multi-loss function
 
             # L = CTC loss ensemble predictions and truth + sum(1,N)[(CTC loss student predictions(i) and truth)+
             # (LDK divergence students predictions(i) and ensemble predictions)
 
             # CTC loss between ensemble predictions and truth
-            #ctc_ensemble = compute_ctc_loss(ensemble_predictions, x_train)
+            labels = tf.convert_to_tensor(x_train['the_labels'])
+            label_length = tf.convert_to_tensor(x_train['label_length'].reshape(-1, 1))
+            input_length = tf.convert_to_tensor(x_train['input_length'].reshape(-1, 1))
+            ensemble_predictions = tf.convert_to_tensor(ensemble_predictions)
+            ensemble_ctc_loss = ctc_lambda_func([ensemble_predictions, labels, input_length, label_length])
+
+            # Todo check sum of probabilities
+
+            # Calculate the mean CTC loss
+            mean_ctc_loss = tf.reduce_mean(y_pred[1], axis=0)
 
             # CTC loss between students predictions and truth
             # Already in student_losses array
-            multiloss = 307.5454545
 
             # LDK divergence between students predictions and ensemble predictions
 
+            #grads = tape.gradient(mean_ctc_loss, lipnet.model.trainable_variables)
+            #adam.apply_gradients(zip(grads, lipnet.model.trainable_variables))
 
 
             b = b + 1
@@ -165,5 +191,6 @@ if __name__ == '__main__':
     # 7th parameter - frames_n
     # 8th parameter - absolute_max_string_length (max len of sentences)
     # 9th parameter - minibatch_size
-    # 10th parameter - number of peer network
-    train(run_name, 0, 10, 3, 100, 50, 100, 54, 19, 2)
+    # 10th parameter - num_samples_stats (number of samples for statistics evaluation)
+    # 11th parameter - number of peer network
+    train(run_name, 0, 10, 3, 100, 50, 100, 54, 19, 95, 2)

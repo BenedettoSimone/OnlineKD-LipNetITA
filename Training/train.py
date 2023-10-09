@@ -5,7 +5,7 @@ sys.path.insert(0, CURRENT_PATH)
 
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
-from keras.optimizers import Adam
+import tensorflow as tf
 from keras.callbacks import TensorBoard, CSVLogger, ModelCheckpoint
 from lipnet.generators import BasicGenerator
 from lipnet.callbacks import Statistics, Visualize
@@ -44,7 +44,7 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
                     absolute_max_string_len=absolute_max_string_len, output_size=lip_gen.get_output_size())
     lipnet.summary()
 
-    adam = Adam(learning_rate=0.0001, beta_1=0.9, beta_2=0.999, epsilon=1e-08)
+    adam = tf.keras.optimizers.Adam(learning_rate=0.0001, beta_1=0.9, beta_2=0.999, epsilon=1e-08)
 
     # the loss calc occurs elsewhere, so use a dummy lambda func for the loss
     lipnet.model.compile(loss={'ctc': lambda y_true, y_pred: y_pred}, optimizer=adam)
