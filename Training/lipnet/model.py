@@ -43,11 +43,13 @@ class LipNet(object):
 
         self.resh1 = tf.keras.layers.TimeDistributed(tf.keras.layers.Flatten())(self.maxp3)
 
+        #  tf.compat.v1.keras.layers.GRU instead of tf.keras.layers.Dense to resolve compatibility
+        #  issues with weights tensorflow 1.10
         self.gru_1 = tf.keras.layers.Bidirectional(
-            tf.keras.layers.GRU(256, return_sequences=True, kernel_initializer='Orthogonal', name='gru1'),
+            tf.compat.v1.keras.layers.GRU(256, return_sequences=True, kernel_initializer='Orthogonal', name='gru1'),
             merge_mode='concat')(self.resh1)
         self.gru_2 = tf.keras.layers.Bidirectional(
-            tf.keras.layers.GRU(256, return_sequences=True, kernel_initializer='Orthogonal', name='gru2'),
+            tf.compat.v1.keras.layers.GRU(256, return_sequences=True, kernel_initializer='Orthogonal', name='gru2'),
             merge_mode='concat')(self.gru_1)
 
         # transforms RNN output to character activations:

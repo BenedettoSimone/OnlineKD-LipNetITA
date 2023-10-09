@@ -6,12 +6,12 @@ import os
 import csv
 import numpy as np
 import editdistance
-import keras
 from wer import wer_sentence
 from nltk.translate import bleu_score
+import tensorflow as tf
 
 
-class Statistics(keras.callbacks.Callback):
+class Statistics(tf.keras.callbacks.Callback):
     """
     A custom callback class for calculating and logging statistics during model training.
 
@@ -46,12 +46,20 @@ class Statistics(keras.callbacks.Callback):
         while num_left > 0:
             output_batch = next(self.generator)[0]
             num_proc = min(output_batch['the_input'].shape[0], num_left)
-            y_pred = self.model_container.predict(output_batch['the_input'][0:num_proc])
-            input_length = output_batch['input_length'][0:num_proc]
+
+            # create sub dictionary
+            sub_batch = {}
+            for key, value in output_batch.items():
+                sub_batch[key] = value[0:num_proc]
+
+            # [0] because the output of the model is: predictions + losses
+            y_pred = self.model_container.model(sub_batch, training=False)[0]
+
+            input_length = sub_batch['input_length']
             decoded_res = self.decoder.decode(y_pred, input_length)
 
             for j in range(0, num_proc):
-                data.append((decoded_res[j], output_batch['source_str'][j]))
+                data.append((decoded_res[j], sub_batch['source_str'][j]))
 
             num_left -= num_proc
 
@@ -98,6 +106,7 @@ class Statistics(keras.callbacks.Callback):
                 ["Epoch", "Samples", "Mean CER", "Mean CER (Norm)", "Mean WER", "Mean WER (Norm)", "Mean BLEU",
                  "Mean BLEU (Norm)"])
 
+    '''
     def on_batch_end(self, batch, logs=None):
         """
         Callback called at the end of each batch during model training to save batch results for KD attention.
@@ -117,8 +126,11 @@ class Statistics(keras.callbacks.Callback):
         self.batches_results = []
 
         return y_pred, mean_bleu, mean_bleu_norm
+        
+    '''
 
     def on_epoch_end(self, epoch, logs={}):
+
         """
         Callback called at the end of each epoch during model training to compute and log statistics.
         """
@@ -138,7 +150,7 @@ class Statistics(keras.callbacks.Callback):
                                "{0:.5f}".format(stats['bleu'][0]), "{0:.5f}".format(stats['bleu'][1])])
 
 
-class Visualize(keras.callbacks.Callback):
+class Visualize(tf.keras.callbacks.Callback):
     """
     A custom callback class for visualizing and saving results during model training.
 
@@ -162,8 +174,14 @@ class Visualize(keras.callbacks.Callback):
     def on_epoch_end(self, epoch, logs={}):
         output_batch = next(self.generator)[0]
 
-        y_pred = self.model_container.predict(output_batch['the_input'][0:self.num_display_sentences])
-        input_length = output_batch['input_length'][0:self.num_display_sentences]
+        # create display_sentences dictionary
+        display_sentences = {}
+        for key, value in output_batch.items():
+            display_sentences[key] = value[0:self.num_display_sentences]
+
+        # [0] because the output of the model is: predictions + losses
+        y_pred = self.model_container.model(display_sentences, training=False)[0]
+        input_length = display_sentences['input_length']
         res = self.decoder.decode(y_pred, input_length)
 
         with open(os.path.join(self.output_dir, 'e%02d.csv' % (epoch)), 'w') as csvfile:
