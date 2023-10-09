@@ -30,8 +30,8 @@ def _decode(y_pred, input_length, greedy=True, beam_width=100, top_paths=1):
     """
     decoded = K.ctc_decode(y_pred=y_pred, input_length=input_length,
                            greedy=greedy, beam_width=beam_width, top_paths=top_paths)
-    paths = [path.eval(session=K.get_session()) for path in decoded[0]]
-    logprobs = decoded[1].eval(session=K.get_session())
+    paths = [path.numpy() for path in decoded[0]]
+    logprobs = decoded[1].numpy()
 
     return (paths, logprobs)
 
@@ -46,7 +46,7 @@ def decode(y_pred, input_length, greedy=True, beam_width=100, top_paths=1, **kwa
         # TODO: compute using language model
         raise NotImplementedError("Language model search is not implemented yet")
     else:
-        # simply output highest probability sequence
+        # simply output the highest probability sequence
         # paths has been sorted from the start
         result = paths[0]
     return result
