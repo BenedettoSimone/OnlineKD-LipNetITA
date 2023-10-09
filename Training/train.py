@@ -50,7 +50,6 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
     lipnet.model.compile(loss={'ctc': lambda y_true, y_pred: y_pred}, optimizer=adam)
 
     # load weights
-
     if start_epoch == 0:
         start_file_w = os.path.join(OUTPUT_DIR, 'startWeight/unseen-weights178.h5')
         lipnet.model.load_weights(start_file_w)
@@ -76,7 +75,7 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
                                  save_weights_only=True, mode='auto', period=1)
 
     lipnet.model.fit_generator(generator=lip_gen.next_train(),
-                               steps_per_epoch=1, epochs=stop_epoch,
+                               steps_per_epoch=lip_gen.default_training_steps, epochs=stop_epoch,
                                validation_data=lip_gen.next_val(), validation_steps=lip_gen.default_validation_steps,
                                callbacks=[checkpoint, statistics, visualize, lip_gen, tensorboard, csv_logger],
                                initial_epoch=start_epoch,
@@ -97,4 +96,4 @@ if __name__ == '__main__':
     # 8th parameter - absolute_max_string_length (max len of sentences)
     # 9th parameter - minibatch_size
     # 10th parameter - num_samples_stats (number of samples for statistics evaluation)
-    train(run_name, 0, 10, 3, 100, 50, 100, 54, 19, 38)
+    train(run_name, 0, 10, 3, 100, 50, 100, 54, 19, 95)
