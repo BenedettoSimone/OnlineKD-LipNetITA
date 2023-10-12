@@ -32,7 +32,6 @@ class Statistics(tf.keras.callbacks.Callback):
         self.generator = generator
         self.num_samples_stats = num_samples_stats
         self.decoder = decoder
-        self.batches_results = []
         if output_dir is not None and not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
 
@@ -96,6 +95,28 @@ class Statistics(tf.keras.callbacks.Callback):
         wrapped_data = [([reference], hypothesis) for reference, hypothesis in data]
         return self.get_mean_tuples(wrapped_data, 1.0, bleu_score.sentence_bleu)
 
+    #TODO merge functions with the mean functions
+    def get_metric_values(self, data, individual_length, func):
+        metric_values = []
+        for i in range(len(data)):
+            value = float(func(data[i][0], data[i][1]))
+            normalized_value = value / individual_length
+            #TODO check if use normalized value or not
+            metric_values.append(value)
+        return metric_values
+
+    def get_cer_values(self, data):
+        mean_individual_length = np.mean([len(pair[1]) for pair in data])
+        return self.get_metric_values(data, mean_individual_length, editdistance.eval)
+
+    def get_wer_values(self, data):
+        mean_individual_length = np.mean([len(pair[1].split()) for pair in data])
+        return self.get_metric_values(data, mean_individual_length, wer_sentence)
+
+    def get_bleu_scores(self, data):
+        wrapped_data = [([reference], hypothesis) for reference, hypothesis in data]
+        return self.get_metric_values(wrapped_data, 1.0, bleu_score.sentence_bleu)
+
     def on_train_begin(self, logs={}):
         """
         Callback called at the beginning of model training to initialize statistics logging.
@@ -106,28 +127,35 @@ class Statistics(tf.keras.callbacks.Callback):
                 ["Epoch", "Samples", "Mean CER", "Mean CER (Norm)", "Mean WER", "Mean WER (Norm)", "Mean BLEU",
                  "Mean BLEU (Norm)"])
 
-    '''
+
     def on_batch_end(self, batch, logs=None):
         """
         Callback called at the end of each batch during model training to save batch results for KD attention.
         """
 
-        y_pred = self.model_container.predict(batch['the_input'])
+        # TODO get directly the output of the forward pass
+
+        # [0] because the output of the model is: predictions + losses
+        y_pred = self.model_container.model(batch, training=False)[0]
+
         input_length = batch['input_length']
         decoded_res = self.decoder.decode(y_pred, input_length)
+
+
+        batch_results = []
 
         # save decoded results in dedicated array to compute
         # useful metrics for KD attention
         for j in range(len(decoded_res)):
-            self.batches_results.append((decoded_res[j], batch['source_str'][j]))
+            batch_results.append((decoded_res[j], batch['source_str'][j]))
 
-        # TODO optimize code: array unuseful
-        mean_bleu, mean_bleu_norm = self.get_mean_bleu_score(self.batches_results)
-        self.batches_results = []
+        cer_values= self.get_cer_values(batch_results)
+        wer_values = self.get_wer_values(batch_results)
+        bleu_scores = self.get_bleu_scores(batch_results)
 
-        return y_pred, mean_bleu, mean_bleu_norm
-        
-    '''
+        return cer_values, wer_values, bleu_scores
+
+
 
     def on_epoch_end(self, epoch, logs={}):
 

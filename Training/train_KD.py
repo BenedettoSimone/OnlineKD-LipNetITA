@@ -16,6 +16,7 @@ import numpy as np
 import datetime
 import tensorflow as tf
 from lipnet.layers import ctc_lambda_func
+from lipnet.shared_mlp import SharedMLP
 
 np.random.seed(55)
 
@@ -31,6 +32,8 @@ PREDICT_DICTIONARY = os.path.join(CURRENT_PATH, 'dictionaries', 'phrases.txt')
 def curriculum_rules(epoch):
     return {'sentence_length': -1, 'flip_probability': 0.5, 'jitter_probability': 0.05}
 
+
+
 def compute_ensemble_output(student_predictions, student_weights):
     ensemble_output = []
 
@@ -44,8 +47,10 @@ def compute_ensemble_output(student_predictions, student_weights):
         # For each sample (i.e. pred1 of s1, pred1 of s2, pred1 of s3)
         # pred * w1 + pred * w2 + pred * w3
         # Sum each student tensor
+        # TODO divide for sum of weights
         ensemble_prediction = np.sum(weighted_predictions, axis=0)
         ensemble_output.append(ensemble_prediction)
+        # Todo check sum of probabilities
 
     ensemble_output = np.array(ensemble_output)
 
@@ -59,12 +64,30 @@ def compute_ensemble_mean_loss(ensemble_output, x_train):
     input_length = tf.convert_to_tensor(x_train['input_length'].reshape(-1, 1))
     ensemble_output = tf.convert_to_tensor(ensemble_output)
     ensemble_ctc_loss = ctc_lambda_func([ensemble_output, labels, input_length, label_length])
-    # Todo check sum of probabilities
 
     # Compute the mean CTC loss
     ensemble_mean_loss = tf.reduce_mean(ensemble_ctc_loss, axis=0)
 
     return ensemble_mean_loss
+
+def kl_divergence(student_prediction, ensemble_output):
+    kl_divergences = []
+
+    for i in range(student_prediction.shape[0]):
+        p = student_prediction[i]
+        q = ensemble_output[i]
+
+        kl_value = np.sum(p * np.log(p / q))
+        kl_divergences.append(kl_value)
+
+    # TODO sum or mean
+    sequence_kl_divergence = np.sum(kl_divergences)
+    return sequence_kl_divergence
+
+
+def LKD(student_prediction, ensemble_output):
+    pass
+
 
 def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, absolute_max_string_len, minibatch_size,
           num_samples_stats, peer_networks_n):
@@ -147,21 +170,26 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
 
                 '''
                 ########################################################################################
-                ### STEP 2: compute student weights to aggregate predictions
+                ### STEP 2: compute features
                 ########################################################################################
                 '''
                 # make prediction on current batch, decode results and save them to compute
                 # metrics useful to perform KD attention
 
-                # TODO modify this method
-                #y_pred, mean_bleu, mean_bleu_norm = statistics.on_batch_end(x_train)
-                # TODO check normalization of weights
-                # student_weights.append(mean_bleu_norm)
-                student_weights = [0.4, 0.6]
+                f1, f2, f3 = statistics.on_batch_end(x_train)
 
             '''
             ########################################################################################
-            ### STEP 3: compute ensemble output
+            ### STEP 3: ensembling strategy
+            ########################################################################################
+            '''
+
+
+
+
+            '''
+            ########################################################################################
+            ### STEP 4: compute ensemble output
             ########################################################################################
             '''
             # At the end of each batch compute ensemble output
@@ -169,7 +197,7 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
 
             '''
             ########################################################################################
-            ### STEP 4: compute multi-loss function
+            ### STEP 5: compute multi-loss function
             ########################################################################################
             '''
             # L = CTC loss ensemble predictions and truth + sum(1,N)[(CTC loss student predictions(i) and truth)+
@@ -182,7 +210,8 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
             # CTC loss between students predictions and truth
             # Already in student_losses array
 
-            # LDK divergence between students predictions and ensemble predictions
+            #TODO show distribution over sequence samples of KL divergence to understand if we can choose the mean kl
+
 
             '''
             ########################################################################################
@@ -219,3 +248,5 @@ if __name__ == '__main__':
     # 10th parameter - num_samples_stats (number of samples for statistics evaluation)
     # 11th parameter - number of peer network
     train(run_name, 0, 10, 3, 100, 50, 100, 54, 19, 95, 2)
+
+
