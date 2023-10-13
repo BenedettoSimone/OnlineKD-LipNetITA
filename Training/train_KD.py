@@ -32,6 +32,30 @@ PREDICT_DICTIONARY = os.path.join(CURRENT_PATH, 'dictionaries', 'phrases.txt')
 def curriculum_rules(epoch):
     return {'sentence_length': -1, 'flip_probability': 0.5, 'jitter_probability': 0.05}
 
+def ensembling_strategy(f1, f2, f3, peer_networks_n):
+
+    # Input dimensions
+    input_dim = peer_networks_n * 3
+    output_dim = peer_networks_n * 3
+
+    # SharedMLP
+    mlp_shared = SharedMLP(input_dim=input_dim, hidden_dim=64, output_dim=output_dim)
+
+    # Concatenate features of students
+    concatenated_features = tf.concat([f1, f2, f3], axis=1) # (b_size,6)[f1_peer1, f1_peer2 f2_peer1 f2_peer2 f3_peer1 f3_peer2]
+
+    # Forward pass
+    predictions = mlp_shared(concatenated_features)  # (b_size,6) [f1_peer1, f1_peer2 f2_peer1 f2_peer2 f3_peer1 f3_peer2]
+
+    # Split mlp output
+    student_weights = []
+    for i in range(peer_networks_n):
+        predictions_student_i = tf.gather(predictions, [i, i+peer_networks_n, i+(peer_networks_n*2)], axis=1)
+        sum_predictions_student_i = tf.reduce_sum(predictions_student_i, axis=1)
+        weights_student_i = tf.math.sigmoid(sum_predictions_student_i)
+        student_weights.append(weights_student_i)
+
+    return student_weights
 
 
 def compute_ensemble_output(student_predictions, student_weights):
@@ -39,18 +63,22 @@ def compute_ensemble_output(student_predictions, student_weights):
 
     # Get how many predictions
     for i in range(student_predictions[0][1].shape[0]):
+        #Get weighted prediction of sample
         weighted_predictions = []
+        weights_pred_i = []
+
+        #Get i prediction of each student
         for student_idx, pred in student_predictions:
-            # Multiply each tensor for the student weight
-            weighted_predictions.append(pred[i] * student_weights[student_idx])
+            # Multiply each tensor for the student weight for the corresponding prediction
+            weighted_predictions.append(pred[i] * student_weights[student_idx][i])
+            weights_pred_i.append(student_weights[student_idx][i])
 
         # For each sample (i.e. pred1 of s1, pred1 of s2, pred1 of s3)
-        # pred * w1 + pred * w2 + pred * w3
+        # (pred * w1 + pred * w2 + pred * w3) / w1+w2+w3
         # Sum each student tensor
-        # TODO divide for sum of weights
         ensemble_prediction = np.sum(weighted_predictions, axis=0)
+        ensemble_prediction = ensemble_prediction / np.sum(weights_pred_i)
         ensemble_output.append(ensemble_prediction)
-        # Todo check sum of probabilities
 
     ensemble_output = np.array(ensemble_output)
 
@@ -85,8 +113,6 @@ def kl_divergence(student_prediction, ensemble_output):
     return sequence_kl_divergence
 
 
-def LKD(student_prediction, ensemble_output):
-    pass
 
 
 def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, absolute_max_string_len, minibatch_size,
@@ -130,7 +156,7 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
 
         # For each batch we train simultaneously n students
         b = 0
-        student_weights = []
+
         student_predictions = []
         student_losses = []
 
@@ -139,6 +165,10 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
             print("Batch {}/{}".format(b, int(lip_gen.default_training_steps)))
 
             x_train, y_train = next(lip_gen.next_train())
+
+            f1_array = np.array([])
+            f2_array = np.array([])
+            f3_array = np.array([])
 
             # train all students on the same batch
             for n, lipnet in enumerate(peer_networks_list):
@@ -178,21 +208,37 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
 
                 f1, f2, f3 = statistics.on_batch_end(x_train)
 
+                # concatenate feature of each student for each sample
+                if f1_array.size > 0:
+                    f1_array = np.vstack((f1_array,f1)).T # (b_size, n_students) es. [[42.  9.], [16.  6.],...., [15.  5.]]
+                else:
+                    f1_array= np.append(f1_array, np.array(f1))
+
+                if f2_array.size > 0:
+                    f2_array = np.vstack((f2_array, f2)).T
+                else:
+                    f2_array = np.append(f2_array, np.array(f2))
+
+                if f3_array.size > 0:
+                    f3_array = np.vstack((f3_array, f3)).T
+                else:
+                    f3_array = np.append(f3_array, np.array(f3))
+
+
             '''
             ########################################################################################
             ### STEP 3: ensembling strategy
             ########################################################################################
             '''
 
-
-
+            student_weights = ensembling_strategy(f1_array, f2_array, f3_array, peer_networks_n)
 
             '''
             ########################################################################################
             ### STEP 4: compute ensemble output
             ########################################################################################
             '''
-            # At the end of each batch compute ensemble output
+
             ensemble_output = compute_ensemble_output(student_predictions, student_weights)
 
             '''
@@ -248,5 +294,3 @@ if __name__ == '__main__':
     # 10th parameter - num_samples_stats (number of samples for statistics evaluation)
     # 11th parameter - number of peer network
     train(run_name, 0, 10, 3, 100, 50, 100, 54, 19, 95, 2)
-
-
