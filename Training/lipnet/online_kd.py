@@ -70,15 +70,48 @@ def compute_ensemble_mean_loss(ensemble_output, x_train):
     return ensemble_mean_loss
 
 def kl_divergence(student_prediction, ensemble_output):
-    kl_divergences = []
+    sequence_kl_divergence = []
 
     for i in range(student_prediction.shape[0]):
         p = student_prediction[i]
         q = ensemble_output[i]
 
         kl_value = np.sum(p * np.log(p / q))
-        kl_divergences.append(kl_value)
+        sequence_kl_divergence.append(kl_value)
 
     # TODO sum or mean
-    sequence_kl_divergence = np.sum(kl_divergences)
-    return sequence_kl_divergence
+
+    mean_kl_divergence = np.mean(sequence_kl_divergence)
+    return sequence_kl_divergence, mean_kl_divergence
+
+
+def kd_loss(student_predictions, ensemble_output, temperature):
+
+    students_kl = []
+
+    # Get i prediction of each student and compute kl divergence
+    for student_idx, pred in student_predictions:
+        kl_values_batch = []
+        for i in range(10):
+            kl_values, mean_kl = kl_divergence(pred[i], ensemble_output[i])
+            kl_values_batch.append(mean_kl)
+            # Use to show scatter plot
+            # kl_values_batch.append(kl_values)
+
+        students_kl.append(temperature**2 * kl_values_batch)
+        '''
+        # Create a scatter plot for each array
+        for i, values in enumerate(kl_values_batch):
+            # New plot for each kl_set
+            plt.figure(i)
+
+            plt.scatter(range(len(values)), values, label=f'Sample {i + 1}')
+
+            plt.title(f'Scatter plot for sample {i + 1}')
+            plt.xlabel('Index')
+            plt.ylabel('Value')
+            plt.legend()
+            plt.savefig("kl_div_"+str(i)+".jpg")                
+            plt.close()
+        '''
+    return students_kl
