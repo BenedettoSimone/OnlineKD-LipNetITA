@@ -91,67 +91,69 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
             f3_array = np.array([])
 
             # train all students on the same batch
+            with tf.GradientTape(persistent=True) as tape:
+                grads = []
+                for n, lipnet in enumerate(peer_networks_list):
+
+                    # define callbacks
+                    statistics = Statistics(lipnet, lip_gen.next_val(), decoder, num_samples_stats,
+                                            output_dir=os.path.join(OUTPUT_DIR, run_name))
+                    visualize = Visualize(os.path.join(OUTPUT_DIR, run_name), lipnet, lip_gen.next_val(), decoder,
+                                          num_display_sentences=minibatch_size)
+
+                    # Forward pass
+                    # this result is a set of prob + losses
+                    y_pred = lipnet.model(x_train, training=True)
+
+                    # Compute the mean CTC loss
+                    student_ctc_loss = tf.reduce_mean(y_pred[1], axis=0)
+                    print("Student {} mean loss: {}".format(n, student_ctc_loss))
+
+                    student_predictions.append((n, y_pred[0]))
+                    student_losses.append(student_ctc_loss)
+
+
+                    # Extract features
+                    f1, f2, f3 = statistics.on_batch_end(x_train)
+    
+                    # concatenate feature of each student for each sample
+                    if f1_array.size > 0:
+                        f1_array = np.vstack(
+                            (f1_array, f1)).T  # (b_size, n_students) es. [[42.  9.], [16.  6.],...., [15.  5.]]
+                    else:
+                        f1_array = np.append(f1_array, np.array(f1))
+    
+                    if f2_array.size > 0:
+                        f2_array = np.vstack((f2_array, f2)).T
+                    else:
+                        f2_array = np.append(f2_array, np.array(f2))
+    
+                    if f3_array.size > 0:
+                        f3_array = np.vstack((f3_array, f3)).T
+                    else:
+                        f3_array = np.append(f3_array, np.array(f3))
+    
+                # At the end of each batch compute ensemble weights
+                student_weights = ensembling_strategy(f1_array, f2_array, f3_array, peer_networks_n)
+    
+                # Sum weighted predictions to compute ensemble output
+                ensemble_output = compute_ensemble_output(student_predictions, student_weights)
+    
+                multiloss_value = multiloss_function(peer_networks_n, ensemble_output, x_train, student_predictions, 1,
+                                       student_losses, 1)
+    
+                print(multiloss_value)
+
+
             for n, lipnet in enumerate(peer_networks_list):
-
-                # define callbacks
-                statistics = Statistics(lipnet, lip_gen.next_val(), decoder, num_samples_stats,
-                                        output_dir=os.path.join(OUTPUT_DIR, run_name))
-                visualize = Visualize(os.path.join(OUTPUT_DIR, run_name), lipnet, lip_gen.next_val(), decoder,
-                                      num_display_sentences=minibatch_size)
-
-                # Forward pass
-                # this result is a set of prob + losses
-                y_pred = lipnet.model(x_train, training=True)
-
-                # Compute the mean CTC loss
-                student_ctc_loss = tf.reduce_mean(y_pred[1], axis=0)
-                print("Student {} mean loss: {}".format(n, student_ctc_loss))
-
-                student_predictions.append((n, y_pred[0]))
-                student_losses.append(student_ctc_loss)
-
-
-
-                # Extract features
-                f1, f2, f3 = statistics.on_batch_end(x_train)
-
-                # concatenate feature of each student for each sample
-                if f1_array.size > 0:
-                    f1_array = np.vstack(
-                        (f1_array, f1)).T  # (b_size, n_students) es. [[42.  9.], [16.  6.],...., [15.  5.]]
-                else:
-                    f1_array = np.append(f1_array, np.array(f1))
-
-                if f2_array.size > 0:
-                    f2_array = np.vstack((f2_array, f2)).T
-                else:
-                    f2_array = np.append(f2_array, np.array(f2))
-
-                if f3_array.size > 0:
-                    f3_array = np.vstack((f3_array, f3)).T
-                else:
-                    f3_array = np.append(f3_array, np.array(f3))
-
-            # At the end of each batch compute ensemble weights
-            student_weights = ensembling_strategy(f1_array, f2_array, f3_array, peer_networks_n)
-
-            # Sum weighted predictions to compute ensemble output
-            ensemble_output = compute_ensemble_output(student_predictions, student_weights)
-
-            multiloss_value = multiloss_function(peer_networks_n, ensemble_output, x_train, student_predictions, 1,
-                                   student_losses, 1)
-
-            print(multiloss_value)
+                #gradients = tape.gradient(student_losses[n], lipnet.model.trainable_variables)
+                gradients = tape.gradient(multiloss_value, lipnet.model.trainable_variables)
+                grads.append(gradients)
 
 
             # Compute gradient for each student
-            for n, lipnet in enumerate(peer_networks_list):
-                lipnet.model.trainable = True
-                with tf.GradientTape() as tape:
-                    loss = student_losses[n]
-                    #gradients = tape.gradient(loss, lipnet.model.trainable_variables)
 
-                #lipnet.model.optimizer.apply_gradients(lipnet.model.gradients)
+                #lipnet.model.optimizer.apply_gradients(zip(gradients, lipnet.trainable_variables))
 
 
 
