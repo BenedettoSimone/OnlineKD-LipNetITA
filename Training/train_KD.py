@@ -15,7 +15,7 @@ from lipnet.model import LipNet
 import numpy as np
 import datetime
 import tensorflow as tf
-from lipnet.online_kd import ensembling_strategy, compute_ensemble_output, multiloss_function
+from lipnet.online_kd import extract_features, ensembling_strategy, compute_ensemble_output, multiloss_function
 
 
 np.random.seed(55)
@@ -51,7 +51,7 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
                         absolute_max_string_len=absolute_max_string_len, output_size=lip_gen.get_output_size())
         lipnet.summary()
 
-        lipnet.model.compile(loss={'ctc': lambda y_true, y_pred: y_pred}, optimizer=adam)
+        #lipnet.model.compile(loss={'ctc': lambda y_true, y_pred: y_pred}, optimizer=adam)
 
         # load weights
         if start_epoch == 0:
@@ -112,26 +112,8 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
                     student_predictions.append((n, y_pred[0]))
                     student_losses.append(student_ctc_loss)
 
-
-                    # Extract features
-                    f1, f2, f3 = statistics.on_batch_end(x_train)
-    
-                    # concatenate feature of each student for each sample
-                    if f1_array.size > 0:
-                        f1_array = np.vstack(
-                            (f1_array, f1)).T  # (b_size, n_students) es. [[42.  9.], [16.  6.],...., [15.  5.]]
-                    else:
-                        f1_array = np.append(f1_array, np.array(f1))
-    
-                    if f2_array.size > 0:
-                        f2_array = np.vstack((f2_array, f2)).T
-                    else:
-                        f2_array = np.append(f2_array, np.array(f2))
-    
-                    if f3_array.size > 0:
-                        f3_array = np.vstack((f3_array, f3)).T
-                    else:
-                        f3_array = np.append(f3_array, np.array(f3))
+                    # Extract_features
+                    f1_array, f2_array, f3_array = extract_features(statistics, x_train, f1_array, f2_array, f3_array)
     
                 # At the end of each batch compute ensemble weights
                 student_weights = ensembling_strategy(f1_array, f2_array, f3_array, peer_networks_n)
@@ -141,8 +123,6 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
     
                 multiloss_value = multiloss_function(peer_networks_n, ensemble_output, x_train, student_predictions, 1,
                                        student_losses, 1)
-    
-                print(multiloss_value)
 
 
             for n, lipnet in enumerate(peer_networks_list):

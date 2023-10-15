@@ -4,7 +4,29 @@ import numpy as np
 from layers import ctc_lambda_func
 import matplotlib.pyplot as plt
 
+def extract_features(statistics, x_train, f1_array, f2_array, f3_array):
 
+    # Extract features
+    f1, f2, f3 = statistics.on_batch_end(x_train)
+
+    # concatenate feature of each student for each sample
+    if f1_array.size > 0:
+        f1_array = np.vstack(
+            (f1_array, f1)).T  # (b_size, n_students) es. [[42.  9.], [16.  6.],...., [15.  5.]]
+    else:
+        f1_array = np.append(f1_array, np.array(f1))
+
+    if f2_array.size > 0:
+        f2_array = np.vstack((f2_array, f2)).T
+    else:
+        f2_array = np.append(f2_array, np.array(f2))
+
+    if f3_array.size > 0:
+        f3_array = np.vstack((f3_array, f3)).T
+    else:
+        f3_array = np.append(f3_array, np.array(f3))
+
+    return f1_array, f2_array, f3_array
 
 def ensembling_strategy(f1, f2, f3, peer_networks_n):
 
