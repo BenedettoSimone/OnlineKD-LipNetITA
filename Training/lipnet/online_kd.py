@@ -2,6 +2,9 @@ import tensorflow as tf
 from shared_mlp import SharedMLP
 import numpy as np
 from layers import ctc_lambda_func
+import matplotlib.pyplot as plt
+
+
 
 def ensembling_strategy(f1, f2, f3, peer_networks_n):
 
@@ -56,7 +59,7 @@ def compute_ensemble_output(student_predictions, student_weights):
     return ensemble_output
 
 
-def compute_ensemble_mean_loss(ensemble_output, x_train):
+def compute_ensemble_loss(ensemble_output, x_train):
 
     labels = tf.convert_to_tensor(x_train['the_labels'])
     label_length = tf.convert_to_tensor(x_train['label_length'].reshape(-1, 1))
@@ -65,9 +68,9 @@ def compute_ensemble_mean_loss(ensemble_output, x_train):
     ensemble_ctc_loss = ctc_lambda_func([ensemble_output, labels, input_length, label_length])
 
     # Compute the mean CTC loss
-    ensemble_mean_loss = tf.reduce_mean(ensemble_ctc_loss, axis=0)
+    ensemble_loss = tf.reduce_mean(ensemble_ctc_loss, axis=0)
 
-    return ensemble_mean_loss
+    return ensemble_loss
 
 def kl_divergence(student_prediction, ensemble_output):
     sequence_kl_divergence = []
@@ -80,7 +83,6 @@ def kl_divergence(student_prediction, ensemble_output):
         sequence_kl_divergence.append(kl_value)
 
     # TODO sum or mean
-
     mean_kl_divergence = np.mean(sequence_kl_divergence)
     return sequence_kl_divergence, mean_kl_divergence
 
@@ -92,12 +94,14 @@ def kd_loss(student_predictions, ensemble_output, temperature):
     # Get i prediction of each student and compute kl divergence
     for student_idx, pred in student_predictions:
         kl_values_batch = []
+        # TODO set shape of pred
         for i in range(10):
             kl_values, mean_kl = kl_divergence(pred[i], ensemble_output[i])
             kl_values_batch.append(mean_kl)
             # Use to show scatter plot
             # kl_values_batch.append(kl_values)
 
+        # TODO kl_values batch contains the mean kl for each sample
         students_kl.append(temperature**2 * kl_values_batch)
         '''
         # Create a scatter plot for each array
@@ -115,3 +119,23 @@ def kd_loss(student_predictions, ensemble_output, temperature):
             plt.close()
         '''
     return students_kl
+
+
+def multiloss_function(peer_networks_n, ensemble_output, x_train, student_predictions, temperature, student_losses, distillation_strength):
+
+    # Ensemble CTC loss
+    ensemble_loss = compute_ensemble_loss(ensemble_output, x_train)
+    print("Ensemble mean loss: {}".format(ensemble_loss))
+
+    students_kl = kd_loss(student_predictions, ensemble_output, temperature)
+
+    student_losses_sum = 0
+    for s in range(peer_networks_n):
+
+        # TODO check mean of students kl
+        res = student_losses[s] + (distillation_strength * np.mean(students_kl[s]))
+        student_losses_sum += res
+
+    multiloss_value = ensemble_loss + student_losses_sum
+
+    return multiloss_value

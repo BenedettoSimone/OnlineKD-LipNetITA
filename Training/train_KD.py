@@ -15,7 +15,7 @@ from lipnet.model import LipNet
 import numpy as np
 import datetime
 import tensorflow as tf
-from lipnet.online_kd import ensembling_strategy, compute_ensemble_output, compute_ensemble_mean_loss
+from lipnet.online_kd import ensembling_strategy, compute_ensemble_output, multiloss_function
 
 
 np.random.seed(55)
@@ -110,21 +110,15 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
                 student_predictions.append((n, y_pred[0]))
                 student_losses.append(student_ctc_loss)
 
-                '''
-                ########################################################################################
-                ### STEP 2: compute features
-                ########################################################################################
-                '''
-                # make prediction on current batch, decode results and save them to compute
-                # metrics useful to perform KD attention
-
+                # Extract features
                 f1, f2, f3 = statistics.on_batch_end(x_train)
 
                 # concatenate feature of each student for each sample
                 if f1_array.size > 0:
-                    f1_array = np.vstack((f1_array,f1)).T # (b_size, n_students) es. [[42.  9.], [16.  6.],...., [15.  5.]]
+                    f1_array = np.vstack(
+                        (f1_array, f1)).T  # (b_size, n_students) es. [[42.  9.], [16.  6.],...., [15.  5.]]
                 else:
-                    f1_array= np.append(f1_array, np.array(f1))
+                    f1_array = np.append(f1_array, np.array(f1))
 
                 if f2_array.size > 0:
                     f2_array = np.vstack((f2_array, f2)).T
@@ -142,23 +136,11 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
             # Sum weighted predictions to compute ensemble output
             ensemble_output = compute_ensemble_output(student_predictions, student_weights)
 
-            '''
-            ########################################################################################
-            ### STEP 5: compute multi-loss function
-            ########################################################################################
-            '''
-            # L = CTC loss ensemble predictions and truth + sum(1,N)[(CTC loss student predictions(i) and truth)+
-            # (LDK divergence students predictions(i) and ensemble predictions)
 
-            # Ensemble CTC loss
-            ensemble_mean_loss = compute_ensemble_mean_loss(ensemble_output, x_train)
-            print("Ensemble mean loss: {}".format(ensemble_mean_loss))
+            multiloss_value = multiloss_function(peer_networks_n, ensemble_output, x_train, student_predictions, 1,
+                                   student_losses, 1)
 
-            # CTC loss between students predictions and truth
-            # Already in student_losses array
-
-            #TODO show distribution over sequence samples of KL divergence to understand if we can choose the mean kl
-
+            print(multiloss_value)
 
             '''
             ########################################################################################
