@@ -43,12 +43,15 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
 
     adam = tf.keras.optimizers.Adam(learning_rate=0.0001, beta_1=0.9, beta_2=0.999, epsilon=1e-08)
 
+
     peer_networks_list = []
 
     for n in range(peer_networks_n):
         lipnet = LipNet(img_c=img_c, img_w=img_w, img_h=img_h, frames_n=frames_n,
                         absolute_max_string_len=absolute_max_string_len, output_size=lip_gen.get_output_size())
         lipnet.summary()
+
+        lipnet.model.compile(loss={'ctc': lambda y_true, y_pred: y_pred}, optimizer=adam)
 
         # load weights
         if start_epoch == 0:
@@ -71,7 +74,7 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
 
         print("Epoch {}/{}".format(epoch + 1, stop_epoch))
 
-        # For each batch we train simultaneously n students
+        # For each batch train simultaneously n students
         b = 0
 
         student_predictions = []
@@ -96,19 +99,18 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
                 visualize = Visualize(os.path.join(OUTPUT_DIR, run_name), lipnet, lip_gen.next_val(), decoder,
                                       num_display_sentences=minibatch_size)
 
+                # Forward pass
+                # this result is a set of prob + losses
+                y_pred = lipnet.model(x_train, training=True)
 
-                with tf.GradientTape() as tape:
-
-                    # Forward pass
-                    # this result is a set of prob + losses
-                    y_pred = lipnet.model(x_train, training=True)
-
-                    # Compute the mean CTC loss
-                    student_ctc_loss = tf.reduce_mean(y_pred[1], axis=0)
-                    print("Student {} mean loss: {}".format(n, student_ctc_loss))
+                # Compute the mean CTC loss
+                student_ctc_loss = tf.reduce_mean(y_pred[1], axis=0)
+                print("Student {} mean loss: {}".format(n, student_ctc_loss))
 
                 student_predictions.append((n, y_pred[0]))
                 student_losses.append(student_ctc_loss)
+
+
 
                 # Extract features
                 f1, f2, f3 = statistics.on_batch_end(x_train)
@@ -136,19 +138,21 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
             # Sum weighted predictions to compute ensemble output
             ensemble_output = compute_ensemble_output(student_predictions, student_weights)
 
-
             multiloss_value = multiloss_function(peer_networks_n, ensemble_output, x_train, student_predictions, 1,
                                    student_losses, 1)
 
             print(multiloss_value)
 
-            '''
-            ########################################################################################
-            ### STEP 5: optimize students
-            ########################################################################################
-            '''
-            #grads = tape.gradient(mean_ctc_loss, lipnet.model.trainable_variables)
-            #adam.apply_gradients(zip(grads, lipnet.model.trainable_variables))
+
+            # Compute gradient for each student
+            for n, lipnet in enumerate(peer_networks_list):
+                lipnet.model.trainable = True
+                with tf.GradientTape() as tape:
+                    loss = student_losses[n]
+                    #gradients = tape.gradient(loss, lipnet.model.trainable_variables)
+
+                #lipnet.model.optimizer.apply_gradients(lipnet.model.gradients)
+
 
 
             b = b + 1
