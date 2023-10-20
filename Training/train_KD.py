@@ -113,11 +113,13 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
                     f1_array, f2_array, f3_array = extract_features(statistics, x_train, f1_array, f2_array, f3_array)
     
                 # At the end of each batch compute ensemble weights
+                # TODO use logits ?
                 student_weights = ensembling_strategy(f1_array, f2_array, f3_array, peer_networks_n)
     
                 # Sum weighted predictions to compute ensemble output
                 ensemble_output = compute_ensemble_output(student_predictions, student_weights)
-    
+
+                # TODO set temperature and distillation_strength
                 multiloss_value = multiloss_function(peer_networks_n, ensemble_output, x_train, student_predictions, 1,
                                        student_losses, 1)
 
@@ -125,19 +127,20 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
 
 
             for n, lipnet in enumerate(peer_networks_list):
-                print("Optimizing model {}".format(n))
+                print("Optimizing student {}".format(n))
                 #gradients = tape.gradient(student_losses[n], lipnet.model.trainable_variables)
                 gradients = tape.gradient(multiloss_value, lipnet.model.trainable_variables)
                 adam.apply_gradients(zip(gradients, lipnet.model.trainable_variables))
 
             b = b + 1
 
-        # Save model weights every 5 epochs
-        #if (epoch + 1) % 5 == 0:
-         #   for n, lipnet in enumerate(peer_networks_list):
-          #      lipnet.model.save_weights(
-           #         os.path.join(OUTPUT_DIR, run_name, "weights{:02d}_peer_{:02d}.h5".format(epoch, n)))
+        # Save weights for each student every 5 epochs
+        if (epoch - start_epoch) % 5 == 0:
+            for n, lipnet in enumerate(peer_networks_list):
+                lipnet.model.save_weights(
+                    os.path.join(OUTPUT_DIR, run_name, "weights{:02d}_peer_{:02d}.h5".format(epoch, n)))
 
+        # TODO save statistic and visualize for each student
         # statistics.on_epoch_end(epoch)
         # visualize.on_epoch_end(epoch)
 
@@ -153,6 +156,6 @@ if __name__ == '__main__':
     # 7th parameter - frames_n
     # 8th parameter - absolute_max_string_length (max len of sentences)
     # 9th parameter - minibatch_size
-    # 10th parameter - num_samples_stats (number of samples for statistics evaluation)
+    # 10th parameter - num_samples_stats (number of samples for statistics evaluation at each epoch)
     # 11th parameter - number of peer network
     train(run_name, 0, 10, 3, 100, 50, 100, 54, 19, 95, 2)
