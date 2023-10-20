@@ -116,8 +116,8 @@ def kd_loss(student_predictions, ensemble_output, temperature):
     # Get i prediction of each student and compute kl divergence
     for student_idx, pred in student_predictions:
         kl_values_batch = []
-        # TODO set shape of pred
-        for i in range(10):
+
+        for i in range(pred.shape[0]):
             kl_values, mean_kl = kl_divergence(pred[i], ensemble_output[i])
             kl_values_batch.append(mean_kl)
             # Use to show scatter plot
