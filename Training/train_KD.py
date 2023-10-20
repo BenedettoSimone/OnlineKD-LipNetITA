@@ -41,7 +41,7 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
                              absolute_max_string_len=absolute_max_string_len,
                              curriculum=curriculum, start_epoch=start_epoch, is_val=True).build()
 
-    adam = tf.keras.optimizers.Adam(learning_rate=0.0001, beta_1=0.9, beta_2=0.999, epsilon=1e-08)
+    adam = tf.keras.optimizers.legacy.Adam(learning_rate=0.0001, beta_1=0.9, beta_2=0.999, epsilon=1e-08)
 
 
     peer_networks_list = []
@@ -50,8 +50,6 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
         lipnet = LipNet(img_c=img_c, img_w=img_w, img_h=img_h, frames_n=frames_n,
                         absolute_max_string_len=absolute_max_string_len, output_size=lip_gen.get_output_size())
         lipnet.summary()
-
-        #lipnet.model.compile(loss={'ctc': lambda y_true, y_pred: y_pred}, optimizer=adam)
 
         # load weights
         if start_epoch == 0:
@@ -92,7 +90,6 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
 
             # train all students on the same batch
             with tf.GradientTape(persistent=True) as tape:
-                grads = []
                 for n, lipnet in enumerate(peer_networks_list):
 
                     # define callbacks
@@ -124,18 +121,14 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
                 multiloss_value = multiloss_function(peer_networks_n, ensemble_output, x_train, student_predictions, 1,
                                        student_losses, 1)
 
+                print("Multiloss value:  {}".format(multiloss_value))
+
 
             for n, lipnet in enumerate(peer_networks_list):
+                print("Optimizing model {}".format(n))
                 #gradients = tape.gradient(student_losses[n], lipnet.model.trainable_variables)
                 gradients = tape.gradient(multiloss_value, lipnet.model.trainable_variables)
-                grads.append(gradients)
-
-
-            # Compute gradient for each student
-
-                #lipnet.model.optimizer.apply_gradients(zip(gradients, lipnet.trainable_variables))
-
-
+                adam.apply_gradients(zip(gradients, lipnet.model.trainable_variables))
 
             b = b + 1
 
