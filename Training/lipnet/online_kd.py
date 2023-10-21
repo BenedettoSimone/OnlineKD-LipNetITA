@@ -160,4 +160,4 @@ def multiloss_function(peer_networks_n, ensemble_output, x_train, student_predic
 
     multiloss_value = ensemble_loss + student_losses_sum
 
-    return multiloss_value
+    return ensemble_loss, multiloss_value
