@@ -4,10 +4,10 @@ import numpy as np
 from layers import ctc_lambda_func
 import matplotlib.pyplot as plt
 
-def extract_features(statistics, x_train, f1_array, f2_array, f3_array):
+def extract_features(statistics, y_pred, x_train, f1_array, f2_array, f3_array):
 
     # Extract features
-    f1, f2, f3 = statistics.on_batch_end(x_train)
+    f1, f2, f3 = statistics.on_batch_end(y_pred, x_train)
 
     # concatenate feature of each student for each sample
     if f1_array.size > 0:

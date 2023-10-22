@@ -126,13 +126,13 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
                     student_losses.append(student_ctc_loss)
 
                     # Extract_features
-                    f1_array, f2_array, f3_array = extract_features(statistics, x_train, f1_array, f2_array, f3_array)
+                    f1_array, f2_array, f3_array = extract_features(statistics,y_pred[0], x_train, f1_array, f2_array, f3_array)
 
                 # At the end of each batch compute ensemble weights
                 student_weights = ensembling_strategy(f1_array, f2_array, f3_array, peer_networks_n)
     
                 # Sum weighted predictions to compute ensemble output
-                # TODO use logits ?
+                # TODO use logits
                 ensemble_output = compute_ensemble_output(student_predictions, student_weights)
 
                 # TODO set temperature and distillation_strength

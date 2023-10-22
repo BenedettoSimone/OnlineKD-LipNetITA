@@ -128,19 +128,13 @@ class Statistics(tf.keras.callbacks.Callback):
                  "Mean BLEU (Norm)"])
 
 
-    def on_batch_end(self, batch, logs=None):
+    def on_batch_end(self, y_pred, batch, logs=None):
         """
         Callback called at the end of each batch during model training to save batch results for KD attention.
         """
 
-        # TODO get directly the output of the forward pass
-
-        # [0] because the output of the model is: predictions + losses
-        y_pred = self.model_container.model(batch, training=False)[0]
-
         input_length = batch['input_length']
         decoded_res = self.decoder.decode(y_pred, input_length)
-
 
         batch_results = []
 
