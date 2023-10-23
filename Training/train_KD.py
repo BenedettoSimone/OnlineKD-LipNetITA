@@ -21,6 +21,7 @@ import tensorflow as tf
 from lipnet.online_kd import extract_features, ensembling_strategy, compute_ensemble_output, multiloss_function
 
 
+
 np.random.seed(55)
 
 DATASET_DIR = os.path.join(CURRENT_PATH, 'datasets')
@@ -36,7 +37,7 @@ def curriculum_rules(epoch):
     return {'sentence_length': -1, 'flip_probability': 0.5, 'jitter_probability': 0.05}
 
 def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, absolute_max_string_len, minibatch_size,
-          num_samples_stats, peer_networks_n):
+          num_samples_stats, peer_networks_n, distillation_strength, temperature):
     curriculum = Curriculum(curriculum_rules)
     lip_gen = BasicGenerator(dataset_path=DATASET_DIR,
                              minibatch_size=minibatch_size,
@@ -94,7 +95,7 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
 
         print("Epoch {}/{}".format(epoch + 1, stop_epoch))
 
-        student_predictions = []
+        student_logits = []
         student_losses = []
 
         # For each batch train simultaneously n students
@@ -115,29 +116,30 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
                     statistics = callback_list[n][0]
 
                     # Forward pass
-                    # this result is a set of prob + losses
-                    y_pred = lipnet.model(x_train, training=True)
+                    # this result is a set of logits + losses
+                    model_out = lipnet.model(x_train, training=True)
+
+                    logits = model_out[0]
+                    losses = model_out[1]
 
                     # Compute the mean CTC loss
-                    student_ctc_loss = tf.reduce_mean(y_pred[1], axis=0)
+                    student_ctc_loss = tf.reduce_mean(losses, axis=0)
                     print("Student {} mean loss: {}".format(n, student_ctc_loss))
 
-                    student_predictions.append((n, y_pred[0]))
+                    student_logits.append((n, logits))
                     student_losses.append(student_ctc_loss)
 
                     # Extract_features
-                    f1_array, f2_array, f3_array = extract_features(statistics,y_pred[0], x_train, f1_array, f2_array, f3_array)
+                    f1_array, f2_array, f3_array = extract_features(statistics, logits, x_train, f1_array, f2_array, f3_array)
 
                 # At the end of each batch compute ensemble weights
                 student_weights = ensembling_strategy(f1_array, f2_array, f3_array, peer_networks_n)
     
-                # Sum weighted predictions to compute ensemble output
-                # TODO use logits
-                ensemble_output = compute_ensemble_output(student_predictions, student_weights)
+                # Sum weighted logits to compute ensemble output
+                ensemble_output = compute_ensemble_output(student_logits, student_weights)
 
-                # TODO set temperature and distillation_strength
-                ensemble_loss, multiloss_value = multiloss_function(peer_networks_n, ensemble_output, x_train, student_predictions, 1,
-                                       student_losses, 1)
+                ensemble_loss, multiloss_value = multiloss_function(peer_networks_n, ensemble_output, x_train, student_logits, temperature,
+                                       student_losses, distillation_strength)
 
                 print("Multiloss value:  {}".format(multiloss_value))
 
@@ -179,15 +181,26 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
 
 if __name__ == '__main__':
     run_name = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
-    # 1st parameter - run_name
-    # 2nd parameter - start_epoch
-    # 3rd parameter - stop_epoch
-    # 4th parameter - img_c (num of channel)
-    # 5th parameter - img_w
-    # 6th parameter - img_h
-    # 7th parameter - frames_n
-    # 8th parameter - absolute_max_string_length (max len of sentences)
-    # 9th parameter - minibatch_size
-    # 10th parameter - num_samples_stats (number of samples for statistics evaluation at each epoch)
-    # 11th parameter - number of peer network
-    train(run_name, 0, 10, 3, 100, 50, 100, 54, 19, 95, 2)
+
+    start_epoch = 0
+    stop_epoch = 10
+
+    # Samples properties
+    img_c = 3  # Image channels
+    img_w = 100  # Image width
+    img_h = 50  # Image height
+    frames_n = 100  # Number of frames per video
+
+    absolute_max_string_len = 54  # Max sentence length
+
+    minibatch_size = 19  # Minibatch size
+
+    num_samples_stats = 95  # Number of samples for statistics evaluation per epoch
+
+    # KD parameters
+    peer_networks_n = 2  # Number of peer networks
+    distillation_strength = 1  # Distillation strength
+    temperature = 3  # Softmax's temperature applied to logits
+
+    train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, absolute_max_string_len, minibatch_size,
+          num_samples_stats, peer_networks_n, distillation_strength, temperature)

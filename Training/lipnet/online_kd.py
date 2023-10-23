@@ -4,7 +4,11 @@ import numpy as np
 from layers import ctc_lambda_func
 import matplotlib.pyplot as plt
 
-def extract_features(statistics, y_pred, x_train, f1_array, f2_array, f3_array):
+
+def extract_features(statistics, logits, x_train, f1_array, f2_array, f3_array):
+
+
+    y_pred = tf.nn.softmax(logits)
 
     # Extract features
     f1, f2, f3 = statistics.on_batch_end(y_pred, x_train)
@@ -54,27 +58,27 @@ def ensembling_strategy(f1, f2, f3, peer_networks_n):
     return student_weights
 
 
-def compute_ensemble_output(student_predictions, student_weights):
+def compute_ensemble_output(student_logits, student_weights):
     ensemble_output = []
 
-    # Get how many predictions
-    for i in range(student_predictions[0][1].shape[0]):
-        #Get weighted prediction of sample
-        weighted_predictions = []
-        weights_pred_i = []
+    # Get how many samples
+    for i in range(student_logits[0][1].shape[0]):
+        # Get weighted logits of sample
+        weighted_logits = []
+        weights_log_i = []
 
-        #Get i prediction of each student
-        for student_idx, pred in student_predictions:
-            # Multiply each tensor for the student weight for the corresponding prediction
-            weighted_predictions.append(pred[i] * student_weights[student_idx][i])
-            weights_pred_i.append(student_weights[student_idx][i])
+        # Get i logits of each student
+        for student_idx, logits in student_logits:
+            # Multiply each tensor for the student weight for the corresponding logits
+            weighted_logits.append(logits[i] * student_weights[student_idx][i])
+            weights_log_i.append(student_weights[student_idx][i])
 
         # For each sample (i.e. pred1 of s1, pred1 of s2, pred1 of s3)
         # (pred * w1 + pred * w2 + pred * w3) / w1+w2+w3
         # Sum each student tensor
-        ensemble_prediction = np.sum(weighted_predictions, axis=0)
-        ensemble_prediction = ensemble_prediction / np.sum(weights_pred_i)
-        ensemble_output.append(ensemble_prediction)
+        ensemble_logits = np.sum(weighted_logits, axis=0)
+        ensemble_logits = ensemble_logits / np.sum(weights_log_i)
+        ensemble_output.append(ensemble_logits)
 
     ensemble_output = np.array(ensemble_output)
 
@@ -87,6 +91,8 @@ def compute_ensemble_loss(ensemble_output, x_train):
     label_length = tf.convert_to_tensor(x_train['label_length'].reshape(-1, 1))
     input_length = tf.convert_to_tensor(x_train['input_length'].reshape(-1, 1))
     ensemble_output = tf.convert_to_tensor(ensemble_output)
+
+    ensemble_output = tf.nn.softmax(ensemble_output)
     ensemble_ctc_loss = ctc_lambda_func([ensemble_output, labels, input_length, label_length])
 
     # Compute the mean CTC loss
@@ -109,16 +115,20 @@ def kl_divergence(student_prediction, ensemble_output):
     return sequence_kl_divergence, mean_kl_divergence
 
 
-def kd_loss(student_predictions, ensemble_output, temperature):
+def kd_loss(student_logits, ensemble_output, temperature):
 
     students_kl = []
 
-    # Get i prediction of each student and compute kl divergence
-    for student_idx, pred in student_predictions:
+    # Get i logits of each student and compute kl divergence
+    for student_idx, logits in student_logits:
         kl_values_batch = []
 
-        for i in range(pred.shape[0]):
-            kl_values, mean_kl = kl_divergence(pred[i], ensemble_output[i])
+        for i in range(logits.shape[0]):
+
+            logits_i =  tf.nn.softmax(tf.math.divide(logits[i], temperature))
+            ensemble_output_i = tf.nn.softmax(tf.math.divide(ensemble_output[i], temperature))
+
+            kl_values, mean_kl = kl_divergence(logits_i, ensemble_output_i)
             kl_values_batch.append(mean_kl)
             # Use to show scatter plot
             # kl_values_batch.append(kl_values)
@@ -143,13 +153,13 @@ def kd_loss(student_predictions, ensemble_output, temperature):
     return students_kl
 
 
-def multiloss_function(peer_networks_n, ensemble_output, x_train, student_predictions, temperature, student_losses, distillation_strength):
+def multiloss_function(peer_networks_n, ensemble_output, x_train, student_logits, temperature, student_losses, distillation_strength):
 
     # Ensemble CTC loss
     ensemble_loss = compute_ensemble_loss(ensemble_output, x_train)
     print("Ensemble mean loss: {}".format(ensemble_loss))
 
-    students_kl = kd_loss(student_predictions, ensemble_output, temperature)
+    students_kl = kd_loss(student_logits, ensemble_output, temperature)
 
     student_losses_sum = 0
     for s in range(peer_networks_n):

@@ -86,14 +86,21 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
 
 if __name__ == '__main__':
     run_name = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
-    # 1st parameter - run_name
-    # 2nd parameter - start_epoch
-    # 3rd parameter - stop_epoch
-    # 4th parameter - img_c (num of channel)
-    # 5th parameter - img_w
-    # 6th parameter - img_h
-    # 7th parameter - frames_n
-    # 8th parameter - absolute_max_string_length (max len of sentences)
-    # 9th parameter - minibatch_size
-    # 10th parameter - num_samples_stats (number of samples for statistics evaluation)
-    train(run_name, 0, 10, 3, 100, 50, 100, 54, 19, 95)
+
+    start_epoch = 0
+    stop_epoch = 10
+
+    # Samples properties
+    img_c = 3  # Image channels
+    img_w = 100  # Image width
+    img_h = 50  # Image height
+    frames_n = 100  # Number of frames per video
+
+    absolute_max_string_len = 54  # Max sentence length
+
+    minibatch_size = 19  # Minibatch size
+
+    num_samples_stats = 95  # Number of samples for statistics evaluation per epoch
+
+    train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, absolute_max_string_len, minibatch_size,
+          num_samples_stats)

@@ -51,8 +51,9 @@ class Statistics(tf.keras.callbacks.Callback):
             for key, value in output_batch.items():
                 sub_batch[key] = value[0:num_proc]
 
-            # [0] because the output of the model is: predictions + losses
-            y_pred = self.model_container.model(sub_batch, training=False)[0]
+            # [0] because the output of the model is: logits + losses
+            logits = self.model_container.model(sub_batch, training=False)[0]
+            y_pred = tf.nn.softmax(logits)
 
             input_length = sub_batch['input_length']
             decoded_res = self.decoder.decode(y_pred, input_length)
@@ -128,6 +129,7 @@ class Statistics(tf.keras.callbacks.Callback):
                  "Mean BLEU (Norm)"])
 
 
+
     def on_batch_end(self, y_pred, batch, logs=None):
         """
         Callback called at the end of each batch during model training to save batch results for KD attention.
@@ -201,8 +203,10 @@ class Visualize(tf.keras.callbacks.Callback):
         for key, value in output_batch.items():
             display_sentences[key] = value[0:self.num_display_sentences]
 
-        # [0] because the output of the model is: predictions + losses
-        y_pred = self.model_container.model(display_sentences, training=False)[0]
+        # [0] because the output of the model is: logits + losses
+        logits = self.model_container.model(display_sentences, training=False)[0]
+        y_pred = tf.nn.softmax(logits)
+
         input_length = display_sentences['input_length']
         res = self.decoder.decode(y_pred, input_length)
 

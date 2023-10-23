@@ -64,7 +64,7 @@ class LipNet(object):
         self.loss_out = CTC('ctc', [self.y_pred, self.labels, self.input_length, self.label_length])
 
         self.model = tf.keras.Model(inputs=[self.input_data, self.labels, self.input_length, self.label_length],
-                                    outputs=[self.y_pred, self.loss_out])
+                                    outputs=[self.dense1, self.loss_out])
 
     def summary(self):
         self.model.summary()
