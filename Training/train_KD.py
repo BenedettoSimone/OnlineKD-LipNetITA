@@ -91,8 +91,13 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
         csvw.writerow(header_losses_csv)
 
     # Training
+    # callback to initialize information for curriculum
+    lip_gen.on_train_begin()
+
     for epoch in range(start_epoch, stop_epoch):
 
+        # callback to update curriculum rules
+        lip_gen.on_epoch_begin(epoch)
         print("Epoch {}/{}".format(epoch + 1, stop_epoch))
 
         student_logits = []

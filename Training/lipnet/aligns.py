@@ -2,7 +2,7 @@ import numpy as np
 
 
 class Align(object):
-    def __init__(self, absolute_max_string_len=32, label_func=None):
+    def __init__(self, absolute_max_string_len=54, label_func=None):
         self.label_func = label_func
         self.absolute_max_string_len = absolute_max_string_len
 
@@ -12,7 +12,6 @@ class Align(object):
         align = [(int(y[0]) / 1000, int(y[1]) / 1000, y[2]) for y in [x.strip().split(" ") for x in lines]]
 
         self.build(align)
-        #print(align)
         return self
 
     def from_array(self, align):
@@ -24,11 +23,6 @@ class Align(object):
         self.sentence = self.get_sentence(align)
         self.label = self.get_label(self.sentence)
         self.padded_label = self.get_padded_label(self.label)
-
-        #print("ALIGN", self.align)
-        #print("SENTENCE", self.sentence)
-        #print("LABEL", self.label)
-        #print("PADDED_LABEL", self.padded_label)
 
     def strip(self, align, items):
         return [sub for sub in align if sub[2] not in items]

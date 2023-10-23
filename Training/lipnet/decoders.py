@@ -63,8 +63,6 @@ class Decoder(object):
     def decode(self, y_pred, input_length):
         decoded = decode(y_pred, input_length, greedy=self.greedy, beam_width=self.beam_width,
                          top_paths=self.top_paths, language_model=self.language_model)
-        print("Prediction: ")
-        print(y_pred)
         preprocessed = []
         for output in decoded:
             out = output

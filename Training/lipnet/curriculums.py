@@ -8,6 +8,7 @@ class Curriculum(object):
         self.epoch = -1
 
     def update(self, epoch, train=True):
+        # Update the curriculum rules based on the current epoch and training flag
         self.epoch = epoch
         self.train = train
         current_rule = self.rules(self.epoch)
@@ -16,6 +17,7 @@ class Curriculum(object):
         self.jitter_probability = current_rule.get('jitter_probability') or 0.0
 
     def apply(self, video, align):
+        # Apply curriculum rules to the video and alignment data
         original_video = video
         if self.sentence_length > 0:
             video, align = VideoAugmenter.pick_subsentence(video, align, self.sentence_length)
