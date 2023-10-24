@@ -211,12 +211,12 @@ class BasicGenerator(keras.callbacks.Callback):
                 self.process_train_epoch += epoch_differences
                 for i in range(epoch_differences):
                     r.shuffle(self.train_list) # Catch up
-                # print "GENERATOR EPOCH {}".format(self.process_train_epoch)
-                # print self.train_list[0]
-            # print "PI: {}, SI: {}, SE: {}".format(cur_train_index, self.cur_train_index.value, self.shared_train_epoch.value)
+                #print ("GENERATOR EPOCH {}".format(self.process_train_epoch))
+                #print( self.train_list[0])
+            #print ("PI: {}, SI: {}, SE: {}".format(cur_train_index, self.cur_train_index.value, self.shared_train_epoch.value))
             if self.curriculum is not None and self.curriculum.epoch != self.process_train_epoch:
                 self.update_curriculum(self.process_train_epoch, train=True)
-            # print "Train [{},{}] {}:{}".format(self.process_train_epoch, epoch_differences, cur_train_index,cur_train_index+self.minibatch_size)
+            #print ("Train [{},{}] {}:{}".format(self.process_train_epoch, epoch_differences, cur_train_index,cur_train_index+self.minibatch_size))
 
             # During the generation of each batch, the curriculum is applied to the video data and alignment
             ret = self.get_batch(cur_train_index, self.minibatch_size, train=True)

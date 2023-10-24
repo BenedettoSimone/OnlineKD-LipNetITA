@@ -45,11 +45,10 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
                              absolute_max_string_len=absolute_max_string_len,
                              curriculum=curriculum, start_epoch=start_epoch, is_val=True).build()
 
-    adam = tf.keras.optimizers.legacy.Adam(learning_rate=0.0001, beta_1=0.9, beta_2=0.999, epsilon=1e-08)
 
 
     peer_networks_list = []
-
+    optimizers = []
     for n in range(peer_networks_n):
         lipnet = LipNet(img_c=img_c, img_w=img_w, img_h=img_h, frames_n=frames_n,
                         absolute_max_string_len=absolute_max_string_len, output_size=lip_gen.get_output_size())
@@ -65,7 +64,10 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
             weight_file = os.path.join(OUTPUT_DIR, os.path.join(run_name, 'weights%02d.h5' % (start_epoch - 1)))
             lipnet.model.load_weights(weight_file)
 
+        adam = tf.keras.optimizers.Adam(learning_rate=0.0001, beta_1=0.9, beta_2=0.999, epsilon=1e-08)
+
         peer_networks_list.append(lipnet)
+        optimizers.append(adam)
 
     spell = Spell(path=PREDICT_DICTIONARY)
     decoder = Decoder(greedy=PREDICT_GREEDY, beam_width=PREDICT_BEAM_WIDTH,
@@ -98,44 +100,50 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
 
         # callback to update curriculum rules
         lip_gen.on_epoch_begin(epoch)
-        print("Epoch {}/{}".format(epoch + 1, stop_epoch))
-
-        student_logits = []
-        student_losses = []
+        print("Epoch {}/{}".format(epoch, stop_epoch))
 
         # For each batch train simultaneously n students
-        # TODO set int(lip_gen.default_training_steps)
-        for batch in range(1):
+        for batch in range(2):
             print("Batch {}/{}".format(batch, int(lip_gen.default_training_steps)))
 
             x_train, y_train = next(lip_gen.next_train())
+
+            student_logits = []
+            student_losses = []
 
             f1_array = np.array([])
             f2_array = np.array([])
             f3_array = np.array([])
 
             # train all students on the same batch
-            with tf.GradientTape(persistent=True) as tape:
-                for n, lipnet in enumerate(peer_networks_list):
+            # TODO rewrite this code
+            with tf.GradientTape() as tape, tf.GradientTape() as tape1:
+                n = 0
+                statistics = callback_list[n][0]
+                model_out = peer_networks_list[n].model(x_train, training=True)
+                logits = model_out[0]
+                losses = model_out[1]
+                # Compute the mean CTC loss
+                student_ctc_loss = tf.reduce_mean(losses, axis=0)
+                print("Student {} mean loss: {}".format(n, student_ctc_loss))
+                student_logits.append((n, logits))
+                student_losses.append(student_ctc_loss)
 
-                    statistics = callback_list[n][0]
+                f1_array, f2_array, f3_array = extract_features(statistics, logits, x_train, f1_array, f2_array, f3_array)
 
-                    # Forward pass
-                    # this result is a set of logits + losses
-                    model_out = lipnet.model(x_train, training=True)
+                n = 1
+                statistics = callback_list[n][0]
+                model_out = peer_networks_list[n].model(x_train, training=True)
+                logits = model_out[0]
+                losses = model_out[1]
+                # Compute the mean CTC loss
+                student_ctc_loss = tf.reduce_mean(losses, axis=0)
+                print("Student {} mean loss: {}".format(n, student_ctc_loss))
+                student_logits.append((n, logits))
+                student_losses.append(student_ctc_loss)
 
-                    logits = model_out[0]
-                    losses = model_out[1]
+                f1_array, f2_array, f3_array = extract_features(statistics, logits, x_train, f1_array, f2_array, f3_array)
 
-                    # Compute the mean CTC loss
-                    student_ctc_loss = tf.reduce_mean(losses, axis=0)
-                    print("Student {} mean loss: {}".format(n, student_ctc_loss))
-
-                    student_logits.append((n, logits))
-                    student_losses.append(student_ctc_loss)
-
-                    # Extract_features
-                    f1_array, f2_array, f3_array = extract_features(statistics, logits, x_train, f1_array, f2_array, f3_array)
 
                 # At the end of each batch compute ensemble weights
                 student_weights = ensembling_strategy(f1_array, f2_array, f3_array, peer_networks_n)
@@ -144,21 +152,27 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
                 ensemble_output = compute_ensemble_output(student_logits, student_weights)
 
                 ensemble_loss, multiloss_value = multiloss_function(peer_networks_n, ensemble_output, x_train, student_logits, temperature,
-                                       student_losses, distillation_strength)
+                                      student_losses, distillation_strength)
 
                 print("Multiloss value:  {}".format(multiloss_value))
 
             # Optimize students
-            for n, lipnet in enumerate(peer_networks_list):
-                print("Optimizing student {}".format(n))
-                #gradients = tape.gradient(student_losses[n], lipnet.model.trainable_variables)
-                gradients = tape.gradient(multiloss_value, lipnet.model.trainable_variables)
-                adam.apply_gradients(zip(gradients, lipnet.model.trainable_variables))
+            n = 0
+            print("Optimizing student {}".format(n))
+            #gradients = tape.gradient(student_losses[n], lipnet.model.trainable_variables)
+            gradients = tape.gradient(multiloss_value, peer_networks_list[n].model.trainable_variables)
+            optimizers[n].apply_gradients(zip(gradients, peer_networks_list[n].model.trainable_variables))
+
+            n = 1
+            print("Optimizing student {}".format(n))
+            # gradients = tape.gradient(student_losses[n], lipnet.model.trainable_variables)
+            gradients = tape1.gradient(multiloss_value, peer_networks_list[n].model.trainable_variables)
+            optimizers[n].apply_gradients(zip(gradients, peer_networks_list[n].model.trainable_variables))
 
             # Save ctc losses and multiloss
-            with open(os.path.join(OUTPUT_DIR, run_name, 'training_metrics.csv'), 'a') as csvfile:
-                csvw = csv.writer(csvfile)
-                csvw.writerow([f"Epoch {epoch} - Batch {batch}"] + [student_losses[n].numpy()[0] for n in range(peer_networks_n)] + [ensemble_loss.numpy()[0], multiloss_value.numpy()[0]])
+            #with open(os.path.join(OUTPUT_DIR, run_name, 'training_metrics.csv'), 'a') as csvfile:
+               # csvw = csv.writer(csvfile)
+                #csvw.writerow([f"Epoch {epoch} - Batch {batch}"] + [student_losses[n].numpy()[0] for n in range(peer_networks_n)] + [ensemble_loss.numpy()[0], multiloss_value.numpy()[0]])
 
 
         # Save weights for each student every 5 epochs
@@ -178,12 +192,6 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
             visualize.on_epoch_end(epoch)
 
 
-
-
-
-
-
-
 if __name__ == '__main__':
     run_name = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
 
@@ -200,7 +208,7 @@ if __name__ == '__main__':
 
     minibatch_size = 19  # Minibatch size
 
-    num_samples_stats = 95  # Number of samples for statistics evaluation per epoch
+    num_samples_stats = 38  # Number of samples for statistics evaluation per epoch
 
     # KD parameters
     peer_networks_n = 2  # Number of peer networks
