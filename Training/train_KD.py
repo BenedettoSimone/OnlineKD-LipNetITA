@@ -146,7 +146,7 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
 
 
                 # At the end of each batch compute ensemble weights
-                student_weights = ensembling_strategy(f1_array, f2_array, f3_array, peer_networks_n)
+                student_weights = ensembling_strategy(f1_array.T, f2_array.T, f3_array.T, peer_networks_n)
     
                 # Sum weighted logits to compute ensemble output
                 ensemble_output = compute_ensemble_output(student_logits, student_weights)
@@ -170,9 +170,9 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
             optimizers[n].apply_gradients(zip(gradients, peer_networks_list[n].model.trainable_variables))
 
             # Save ctc losses and multiloss
-            #with open(os.path.join(OUTPUT_DIR, run_name, 'training_metrics.csv'), 'a') as csvfile:
-               # csvw = csv.writer(csvfile)
-                #csvw.writerow([f"Epoch {epoch} - Batch {batch}"] + [student_losses[n].numpy()[0] for n in range(peer_networks_n)] + [ensemble_loss.numpy()[0], multiloss_value.numpy()[0]])
+            with open(os.path.join(OUTPUT_DIR, run_name, 'training_metrics.csv'), 'a') as csvfile:
+                csvw = csv.writer(csvfile)
+                csvw.writerow([f"Epoch {epoch} - Batch {batch}"] + [student_losses[n].numpy()[0] for n in range(peer_networks_n)] + [ensemble_loss.numpy()[0], multiloss_value.numpy()[0]])
 
 
         # Save weights for each student every 5 epochs
@@ -208,7 +208,7 @@ if __name__ == '__main__':
 
     minibatch_size = 19  # Minibatch size
 
-    num_samples_stats = 38  # Number of samples for statistics evaluation per epoch
+    num_samples_stats = 95  # Number of samples for statistics evaluation per epoch
 
     # KD parameters
     peer_networks_n = 2  # Number of peer networks
