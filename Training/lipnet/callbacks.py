@@ -96,14 +96,12 @@ class Statistics(tf.keras.callbacks.Callback):
         wrapped_data = [([reference], hypothesis) for reference, hypothesis in data]
         return self.get_mean_tuples(wrapped_data, 1.0, bleu_score.sentence_bleu)
 
-    #TODO merge functions with the mean functions
     def get_metric_values(self, data, individual_length, func):
         metric_values = []
         for i in range(len(data)):
             value = float(func(data[i][0], data[i][1]))
             normalized_value = value / individual_length
-            #TODO check if use normalized value or not
-            metric_values.append(value)
+            metric_values.append(normalized_value)
         return metric_values
 
     def get_cer_values(self, data):

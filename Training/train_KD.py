@@ -5,8 +5,6 @@ sys.path.insert(0, CURRENT_PATH)
 
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
-# TODO use fstring instead of format
-
 from lipnet.generators import BasicGenerator
 from lipnet.callbacks import Statistics, Visualize
 from lipnet.curriculums import Curriculum
@@ -36,6 +34,7 @@ PREDICT_DICTIONARY = os.path.join(CURRENT_PATH, 'dictionaries', 'phrases.txt')
 def curriculum_rules(epoch):
     return {'sentence_length': -1, 'flip_probability': 0.5, 'jitter_probability': 0.05}
 
+@tf.function
 def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, absolute_max_string_len, minibatch_size,
           num_samples_stats, peer_networks_n, distillation_strength, temperature):
     curriculum = Curriculum(curriculum_rules)
@@ -116,7 +115,6 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
             f3_array = np.array([])
 
             # train all students on the same batch
-            # TODO rewrite this code
             with tf.GradientTape() as tape, tf.GradientTape() as tape1:
                 n = 0
                 statistics = callback_list[n][0]
@@ -196,7 +194,7 @@ if __name__ == '__main__':
     run_name = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
 
     start_epoch = 0
-    stop_epoch = 10
+    stop_epoch = 100
 
     # Samples properties
     img_c = 3  # Image channels
@@ -206,7 +204,7 @@ if __name__ == '__main__':
 
     absolute_max_string_len = 54  # Max sentence length
 
-    minibatch_size = 19  # Minibatch size
+    minibatch_size = 32  # Minibatch size
 
     num_samples_stats = 95  # Number of samples for statistics evaluation per epoch
 
@@ -214,6 +212,7 @@ if __name__ == '__main__':
     peer_networks_n = 2  # Number of peer networks
     distillation_strength = 1  # Distillation strength
     temperature = 3  # Softmax's temperature applied to logits
+
 
     train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, absolute_max_string_len, minibatch_size,
           num_samples_stats, peer_networks_n, distillation_strength, temperature)

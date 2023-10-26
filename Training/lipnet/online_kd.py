@@ -51,6 +51,8 @@ def ensembling_strategy(f1, f2, f3, peer_networks_n):
     student_weights = []
     for i in range(peer_networks_n):
         predictions_student_i = tf.gather(predictions, [i, i+peer_networks_n, i+(peer_networks_n*2)], axis=1)
+        # These weights are determined through an element-wise summation operation on the
+        # outputs of the perceptron, followed by passing them through a sigmoid activation function
         sum_predictions_student_i = tf.reduce_sum(predictions_student_i, axis=1)
         weights_student_i = tf.math.sigmoid(sum_predictions_student_i)
         student_weights.append(weights_student_i)
@@ -110,7 +112,7 @@ def kl_divergence(student_prediction, ensemble_output):
         kl_value = np.sum(p * np.log(p / q))
         sequence_kl_divergence.append(kl_value)
 
-    # TODO sum or mean
+    # TODO sum or mean or median
     mean_kl_divergence = np.mean(sequence_kl_divergence)
     return sequence_kl_divergence, mean_kl_divergence
 
@@ -133,7 +135,7 @@ def kd_loss(student_logits, ensemble_output, temperature):
             # Use to show scatter plot
             # kl_values_batch.append(kl_values)
 
-        # TODO kl_values batch contains the mean kl for each sample
+        # kl_values batch contains the kl value for each sample
         students_kl.append(temperature**2 * kl_values_batch)
         '''
         # Create a scatter plot for each array
@@ -164,7 +166,7 @@ def multiloss_function(peer_networks_n, ensemble_output, x_train, student_logits
     student_losses_sum = 0
     for s in range(peer_networks_n):
 
-        # TODO check mean of students kl
+        # use mean of the kl value of each sample
         res = student_losses[s] + (distillation_strength * np.mean(students_kl[s]))
         student_losses_sum += res
 

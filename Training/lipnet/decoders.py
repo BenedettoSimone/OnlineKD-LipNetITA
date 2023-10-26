@@ -43,7 +43,6 @@ def decode(y_pred, input_length, greedy=True, beam_width=100, top_paths=1, **kwa
                               greedy=greedy, beam_width=beam_width, top_paths=top_paths)
 
     if language_model is not None:
-        # TODO: compute using language model
         raise NotImplementedError("Language model search is not implemented yet")
     else:
         # simply output the highest probability sequence

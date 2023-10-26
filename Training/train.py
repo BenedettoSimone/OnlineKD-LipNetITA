@@ -88,7 +88,7 @@ if __name__ == '__main__':
     run_name = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
 
     start_epoch = 0
-    stop_epoch = 10
+    stop_epoch = 100
 
     # Samples properties
     img_c = 3  # Image channels
@@ -98,7 +98,7 @@ if __name__ == '__main__':
 
     absolute_max_string_len = 54  # Max sentence length
 
-    minibatch_size = 19  # Minibatch size
+    minibatch_size = 32  # Minibatch size
 
     num_samples_stats = 95  # Number of samples for statistics evaluation per epoch
 
