@@ -112,7 +112,7 @@ def kl_divergence(student_prediction, ensemble_output):
         kl_value = np.sum(p * np.log(p / q))
         sequence_kl_divergence.append(kl_value)
 
-    # TODO sum or mean or median
+    # TODO use an appropriate formula for KL div over sequences
     mean_kl_divergence = np.mean(sequence_kl_divergence)
     return sequence_kl_divergence, mean_kl_divergence
 
@@ -130,7 +130,7 @@ def kd_loss(student_logits, ensemble_output, temperature):
             logits_i =  tf.nn.softmax(tf.math.divide(logits[i], temperature))
             ensemble_output_i = tf.nn.softmax(tf.math.divide(ensemble_output[i], temperature))
 
-            kl_values, mean_kl = kl_divergence(logits_i, ensemble_output_i)
+            kl_values, mean_kl = kl_divergence(ensemble_output_i, logits_i)
             kl_values_batch.append(mean_kl)
             # Use to show scatter plot
             # kl_values_batch.append(kl_values)
