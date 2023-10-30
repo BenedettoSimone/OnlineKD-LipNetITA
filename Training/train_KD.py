@@ -34,7 +34,7 @@ PREDICT_DICTIONARY = os.path.join(CURRENT_PATH, 'dictionaries', 'phrases.txt')
 def curriculum_rules(epoch):
     return {'sentence_length': -1, 'flip_probability': 0.5, 'jitter_probability': 0.05}
 
-@tf.function
+#@tf.function
 def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, absolute_max_string_len, minibatch_size,
           num_samples_stats, peer_networks_n, distillation_strength, temperature):
     curriculum = Curriculum(curriculum_rules)
@@ -91,11 +91,20 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
         csvw = csv.writer(csvfile)
         csvw.writerow(header_losses_csv)
 
+    student_losses_header = [f"{phase}_loss_s{n}" for n in range(peer_networks_n) for phase in ["train", "val"]]
+    header_losses_csv = ["Epoch"] + student_losses_header
+
+    with open(os.path.join(LOG_DIR, f'training_{run_name}.csv'), 'w') as csvfile:
+        csvw = csv.writer(csvfile)
+        csvw.writerow(header_losses_csv)
+
     # Training
     # callback to initialize information for curriculum
     lip_gen.on_train_begin()
 
     for epoch in range(start_epoch, stop_epoch):
+
+        epoch_losses = []
 
         # callback to update curriculum rules
         lip_gen.on_epoch_begin(epoch)
@@ -142,6 +151,8 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
 
                 f1_array, f2_array, f3_array = extract_features(statistics, logits, x_train, f1_array, f2_array, f3_array)
 
+                # append array of losses in another array dedicated at each epoch
+                epoch_losses.append(student_losses)
 
                 # At the end of each batch compute ensemble weights
                 student_weights = ensembling_strategy(f1_array.T, f2_array.T, f3_array.T, peer_networks_n)
@@ -181,13 +192,33 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
             lipnet.model.save_weights(
                 os.path.join(OUTPUT_DIR, run_name, "s{}".format(n), "weights{:02d}_peer_{:02d}.h5".format(epoch, n)))
 
+        student_val_losses = []
         # Save statistics and decoded phrases for each student
         for callbacks in callback_list:
             statistics = callbacks[0]
             visualize = callbacks[1]
 
-            statistics.on_epoch_end(epoch)
+            validation_loss = statistics.on_epoch_end(epoch) # return mean val loss
+            print(f"Validation loss: {validation_loss}")
+
+            student_val_losses.append(validation_loss)
             visualize.on_epoch_end(epoch)
+
+
+        # Save logs
+        # Training losses
+        mean_epoch_losses = np.mean(np.array(epoch_losses), axis=0)
+
+        # Merge Train and validation losses
+        results = np.squeeze(np.stack((mean_epoch_losses, np.array(student_val_losses).reshape(-1,1))).T)
+
+        with open(os.path.join(LOG_DIR, f'training_{run_name}.csv'), 'a') as csvfile:
+            csvw = csv.writer(csvfile)
+            row = [f"Epoch {epoch}"] + [value for student_loss in results for value in student_loss]
+            csvw.writerow(row)
+
+
+
 
 
 if __name__ == '__main__':

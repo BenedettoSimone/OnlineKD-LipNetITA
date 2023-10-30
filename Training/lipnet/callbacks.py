@@ -41,6 +41,7 @@ class Statistics(tf.keras.callbacks.Callback):
         """
         num_left = num
         data = []
+        val_ctc_losses = np.array([])
 
         while num_left > 0:
             output_batch = next(self.generator)[0]
@@ -51,8 +52,12 @@ class Statistics(tf.keras.callbacks.Callback):
             for key, value in output_batch.items():
                 sub_batch[key] = value[0:num_proc]
 
-            # [0] because the output of the model is: logits + losses
-            logits = self.model_container.model(sub_batch, training=False)[0]
+            # output of the model is: logits + losses
+            model_out = self.model_container.model(sub_batch, training=False)
+            logits = model_out[0]
+            losses = model_out[1]
+            val_ctc_losses = np.append(val_ctc_losses, losses.numpy())
+
             y_pred = tf.nn.softmax(logits)
 
             input_length = sub_batch['input_length']
@@ -67,11 +72,16 @@ class Statistics(tf.keras.callbacks.Callback):
         mean_wer, mean_wer_norm = self.get_mean_word_error_rate(data)
         mean_bleu, mean_bleu_norm = self.get_mean_bleu_score(data)
 
+        # Compute the mean CTC loss
+        # TODO check mean
+        validation_loss = np.mean(val_ctc_losses)
+
         return {
             'samples': num,
             'cer': (mean_cer, mean_cer_norm),
             'wer': (mean_wer, mean_wer_norm),
-            'bleu': (mean_bleu, mean_bleu_norm)
+            'bleu': (mean_bleu, mean_bleu_norm),
+            'validation_loss': validation_loss
         }
 
     def get_mean_tuples(self, data, individual_length, func):
@@ -127,7 +137,7 @@ class Statistics(tf.keras.callbacks.Callback):
                  "Mean BLEU (Norm)"])
 
 
-
+    '''
     def on_batch_end(self, y_pred, batch, logs=None):
         """
         Callback called at the end of each batch during model training to save batch results for KD attention.
@@ -148,7 +158,7 @@ class Statistics(tf.keras.callbacks.Callback):
         bleu_scores = self.get_bleu_scores(batch_results)
 
         return cer_values, wer_values, bleu_scores
-
+    '''
 
 
     def on_epoch_end(self, epoch, logs={}):
@@ -170,7 +180,8 @@ class Statistics(tf.keras.callbacks.Callback):
                                "{0:.5f}".format(stats['cer'][0]), "{0:.5f}".format(stats['cer'][1]),
                                "{0:.5f}".format(stats['wer'][0]), "{0:.5f}".format(stats['wer'][1]),
                                "{0:.5f}".format(stats['bleu'][0]), "{0:.5f}".format(stats['bleu'][1])])
-
+        
+        return stats['validation_loss']
 
 class Visualize(tf.keras.callbacks.Callback):
     """
