@@ -18,8 +18,6 @@ import datetime
 import tensorflow as tf
 from lipnet.online_kd import extract_features, ensembling_strategy, compute_ensemble_output, multiloss_function
 
-
-
 np.random.seed(55)
 
 DATASET_DIR = os.path.join(CURRENT_PATH, 'datasets')
@@ -34,7 +32,8 @@ PREDICT_DICTIONARY = os.path.join(CURRENT_PATH, 'dictionaries', 'phrases.txt')
 def curriculum_rules(epoch):
     return {'sentence_length': -1, 'flip_probability': 0.5, 'jitter_probability': 0.05}
 
-#@tf.function
+
+# @tf.function
 def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, absolute_max_string_len, minibatch_size,
           num_samples_stats, peer_networks_n, distillation_strength, temperature):
     curriculum = Curriculum(curriculum_rules)
@@ -43,8 +42,6 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
                              img_c=img_c, img_w=img_w, img_h=img_h, frames_n=frames_n,
                              absolute_max_string_len=absolute_max_string_len,
                              curriculum=curriculum, start_epoch=start_epoch, is_val=True).build()
-
-
 
     peer_networks_list = []
     optimizers = []
@@ -84,6 +81,7 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
 
         callback_list.append((statistics, visualize))
 
+    # Csv file to store KD metrics
     student_losses_header = [f"Loss student {n}" for n in range(peer_networks_n)]
     header_losses_csv = ["Epoch - Batch"] + student_losses_header + ["Ensemble loss", "Multiloss value"]
 
@@ -91,6 +89,7 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
         csvw = csv.writer(csvfile)
         csvw.writerow(header_losses_csv)
 
+    # Csv file to store train/val losses
     student_losses_header = [f"{phase}_loss_s{n}" for n in range(peer_networks_n) for phase in ["train", "val"]]
     header_losses_csv = ["Epoch"] + student_losses_header
 
@@ -98,12 +97,12 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
         csvw = csv.writer(csvfile)
         csvw.writerow(header_losses_csv)
 
-    # Training
-    # callback to initialize information for curriculum
+    # Callback to initialize information for curriculum
     lip_gen.on_train_begin()
 
     for epoch in range(start_epoch, stop_epoch):
 
+        # Store losses of each peer network for each batch
         epoch_losses = []
 
         # callback to update curriculum rules
@@ -111,7 +110,7 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
         print("Epoch {}/{}".format(epoch, stop_epoch))
 
         # For each batch train simultaneously n students
-        for batch in range(2):
+        for batch in range(int(lip_gen.default_training_steps)):
             print("Batch {}/{}".format(batch, int(lip_gen.default_training_steps)))
 
             x_train, y_train = next(lip_gen.next_train())
@@ -136,7 +135,8 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
                 student_logits.append((n, logits))
                 student_losses.append(student_ctc_loss)
 
-                f1_array, f2_array, f3_array = extract_features(statistics, logits, x_train, f1_array, f2_array, f3_array)
+                f1_array, f2_array, f3_array = extract_features(statistics, logits, x_train, f1_array, f2_array,
+                                                                f3_array)
 
                 n = 1
                 statistics = callback_list[n][0]
@@ -149,43 +149,42 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
                 student_logits.append((n, logits))
                 student_losses.append(student_ctc_loss)
 
-                f1_array, f2_array, f3_array = extract_features(statistics, logits, x_train, f1_array, f2_array, f3_array)
+                f1_array, f2_array, f3_array = extract_features(statistics, logits, x_train, f1_array, f2_array,
+                                                                f3_array)
 
                 # append array of losses in another array dedicated at each epoch
                 epoch_losses.append(student_losses)
 
                 # At the end of each batch compute ensemble weights
                 student_weights = ensembling_strategy(f1_array.T, f2_array.T, f3_array.T, peer_networks_n)
-    
+
                 # Sum weighted logits to compute ensemble output
                 ensemble_output = compute_ensemble_output(student_logits, student_weights)
 
-                ensemble_loss, multiloss_value = multiloss_function(peer_networks_n, ensemble_output, x_train, student_logits, temperature,
-                                      student_losses, distillation_strength)
+                ensemble_loss, multiloss_value = multiloss_function(peer_networks_n, ensemble_output, x_train,
+                                                                    student_logits, temperature,
+                                                                    student_losses, distillation_strength)
 
                 print("Multiloss value:  {}".format(multiloss_value))
 
             # Optimize students
             n = 0
             print("Optimizing student {}".format(n))
-            #gradients = tape.gradient(student_losses[n], lipnet.model.trainable_variables)
             gradients = tape.gradient(multiloss_value, peer_networks_list[n].model.trainable_variables)
             optimizers[n].apply_gradients(zip(gradients, peer_networks_list[n].model.trainable_variables))
 
             n = 1
             print("Optimizing student {}".format(n))
-            # gradients = tape.gradient(student_losses[n], lipnet.model.trainable_variables)
             gradients = tape1.gradient(multiloss_value, peer_networks_list[n].model.trainable_variables)
             optimizers[n].apply_gradients(zip(gradients, peer_networks_list[n].model.trainable_variables))
 
             # Save ctc losses and multiloss
             with open(os.path.join(OUTPUT_DIR, run_name, 'training_metrics.csv'), 'a') as csvfile:
                 csvw = csv.writer(csvfile)
-                csvw.writerow([f"Epoch {epoch} - Batch {batch}"] + [student_losses[n].numpy()[0] for n in range(peer_networks_n)] + [ensemble_loss.numpy()[0], multiloss_value.numpy()[0]])
-
-
-        # Save weights for each student every 5 epochs
-        #if (epoch - start_epoch) % 5 == 0:
+                csvw.writerow([f"Epoch {epoch} - Batch {batch}"] + [student_losses[n].numpy()[0] for n in
+                                                                    range(peer_networks_n)] + [ensemble_loss.numpy()[0],
+                                                                                               multiloss_value.numpy()[
+                                                                                                   0]])
 
         # Save weights for each student every epoch
         for n, lipnet in enumerate(peer_networks_list):
@@ -198,27 +197,23 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
             statistics = callbacks[0]
             visualize = callbacks[1]
 
-            validation_loss = statistics.on_epoch_end(epoch) # return mean val loss
+            validation_loss = statistics.on_epoch_end(epoch)  # return mean val loss
             print(f"Validation loss: {validation_loss}")
 
             student_val_losses.append(validation_loss)
             visualize.on_epoch_end(epoch)
-
 
         # Save logs
         # Training losses
         mean_epoch_losses = np.mean(np.array(epoch_losses), axis=0)
 
         # Merge Train and validation losses
-        results = np.squeeze(np.stack((mean_epoch_losses, np.array(student_val_losses).reshape(-1,1))).T)
+        results = np.squeeze(np.stack((mean_epoch_losses, np.array(student_val_losses).reshape(-1, 1))).T)
 
         with open(os.path.join(LOG_DIR, f'training_{run_name}.csv'), 'a') as csvfile:
             csvw = csv.writer(csvfile)
             row = [f"Epoch {epoch}"] + [value for student_loss in results for value in student_loss]
             csvw.writerow(row)
-
-
-
 
 
 if __name__ == '__main__':
@@ -242,8 +237,7 @@ if __name__ == '__main__':
     # KD parameters
     peer_networks_n = 2  # Number of peer networks
     distillation_strength = 1  # Distillation strength
-    temperature = 3  # Softmax's temperature applied to logits
-
+    temperature = 3  # Temperature for softmax applied to logits
 
     train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, absolute_max_string_len, minibatch_size,
           num_samples_stats, peer_networks_n, distillation_strength, temperature)

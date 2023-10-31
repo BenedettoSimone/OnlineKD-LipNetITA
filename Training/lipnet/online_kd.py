@@ -102,17 +102,17 @@ def compute_ensemble_loss(ensemble_output, x_train):
 
     return ensemble_loss
 
-def kl_divergence(student_prediction, ensemble_output):
+def kl_divergence(ensemble_output, student_prediction):
     sequence_kl_divergence = []
 
     for i in range(student_prediction.shape[0]):
-        p = student_prediction[i]
-        q = ensemble_output[i]
+        p = ensemble_output[i]
+        q = student_prediction[i]
 
         kl_value = np.sum(p * np.log(p / q))
         sequence_kl_divergence.append(kl_value)
 
-    # compute sum KL div over sequences
+    # compute sum KL div over sequence
     sum_kl_divergence = np.sum(sequence_kl_divergence)
     return sequence_kl_divergence, sum_kl_divergence
 
@@ -130,8 +130,8 @@ def kd_loss(student_logits, ensemble_output, temperature):
             logits_i =  tf.nn.softmax(tf.math.divide(logits[i], temperature))
             ensemble_output_i = tf.nn.softmax(tf.math.divide(ensemble_output[i], temperature))
 
-            kl_values, mean_kl = kl_divergence(ensemble_output_i, logits_i)
-            kl_values_batch.append(mean_kl)
+            kl_values, sum_kl = kl_divergence(ensemble_output_i, logits_i)
+            kl_values_batch.append(sum_kl)
             # Use to show scatter plot
             # kl_values_batch.append(kl_values)
 
@@ -166,7 +166,7 @@ def multiloss_function(peer_networks_n, ensemble_output, x_train, student_logits
     student_losses_sum = 0
     for s in range(peer_networks_n):
 
-        # use mean of the kl value of each sample
+        # use mean of the kl values over samples
         res = student_losses[s] + (distillation_strength * np.mean(students_kl[s]))
         student_losses_sum += res
 
