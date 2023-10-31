@@ -112,9 +112,9 @@ def kl_divergence(student_prediction, ensemble_output):
         kl_value = np.sum(p * np.log(p / q))
         sequence_kl_divergence.append(kl_value)
 
-    # TODO use an appropriate formula for KL div over sequences
-    mean_kl_divergence = np.mean(sequence_kl_divergence)
-    return sequence_kl_divergence, mean_kl_divergence
+    # compute sum KL div over sequences
+    sum_kl_divergence = np.sum(sequence_kl_divergence)
+    return sequence_kl_divergence, sum_kl_divergence
 
 
 def kd_loss(student_logits, ensemble_output, temperature):
