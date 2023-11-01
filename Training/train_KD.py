@@ -93,7 +93,7 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
     student_losses_header = [f"{phase}_loss_s{n}" for n in range(peer_networks_n) for phase in ["train", "val"]]
     header_losses_csv = ["Epoch"] + student_losses_header
 
-    with open(os.path.join(LOG_DIR, f'training_{run_name}.csv'), 'w') as csvfile:
+    with open(os.path.join(LOG_DIR, f'training-{run_name}.csv'), 'w') as csvfile:
         csvw = csv.writer(csvfile)
         csvw.writerow(header_losses_csv)
 
@@ -210,7 +210,7 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
         # Merge Train and validation losses
         results = np.squeeze(np.stack((mean_epoch_losses, np.array(student_val_losses).reshape(-1, 1))).T)
 
-        with open(os.path.join(LOG_DIR, f'training_{run_name}.csv'), 'a') as csvfile:
+        with open(os.path.join(LOG_DIR, f'training-{run_name}.csv'), 'a') as csvfile:
             csvw = csv.writer(csvfile)
             row = [f"Epoch {epoch}"] + [value for student_loss in results for value in student_loss]
             csvw.writerow(row)
