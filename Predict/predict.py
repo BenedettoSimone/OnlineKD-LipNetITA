@@ -5,15 +5,12 @@ LIPNET_PATH = os.path.join(CURRENT_PATH,'..','Training')
 sys.path.insert(0, LIPNET_PATH)
 
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
-
 from Training.lipnet.videos import Video
-from Training.lipnet.visualization import show_video_subtitle
 from Training.lipnet.decoders import Decoder
 from Training.lipnet.helpers import labels_to_text
 from Training.lipnet.spell import Spell
 from Training.lipnet.model import LipNet
-from keras.optimizers import Adam
-from keras import backend as K
+import tensorflow as tf
 import numpy as np
 
 np.random.seed(55)
@@ -38,20 +35,14 @@ def predict(weight_path, video_path, absolute_max_string_len=54, output_size=28)
         video.from_frames(video_path)
     print ("Data loaded.\n")
 
-    if K.image_data_format() == 'channels_first':
+    if tf.keras.backend.image_data_format() == 'channels_first':
         img_c, frames_n, img_w, img_h = video.data.shape
-        print(img_c)
     else:
         frames_n, img_w, img_h, img_c = video.data.shape
-        print(img_c)
-
 
     lipnet = LipNet(img_c=img_c, img_w=img_w, img_h=img_h, frames_n=frames_n,
                     absolute_max_string_len=absolute_max_string_len, output_size=output_size)
 
-    adam = Adam(lr=0.0001, beta_1=0.9, beta_2=0.999, epsilon=1e-08)
-
-    lipnet.model.compile(loss={'ctc': lambda y_true, y_pred: y_pred}, optimizer=adam)
     lipnet.model.load_weights(weight_path)
 
     spell = Spell(path=PREDICT_DICTIONARY)
@@ -61,10 +52,23 @@ def predict(weight_path, video_path, absolute_max_string_len=54, output_size=28)
     X_data       = np.array([video.data]).astype(np.float32) / 255   # Normalize
     input_length = np.array([len(video.data)])
 
-    y_pred         = lipnet.predict(X_data)
-    result         = decoder.decode(y_pred, input_length)[0]
+    # Dummy data
+    label_length =  np.full((1, 1), 10)
+    Y_data = np.full((1, 54), 10)
 
-    return (video, result)
+
+    inputs = {'the_input': X_data,
+              'the_labels': Y_data,
+              'input_length': input_length,
+              'label_length': label_length
+              }
+
+    logits = lipnet.model(inputs, training=False)[0]
+    y_pred = tf.nn.softmax(logits)
+
+    result = decoder.decode(y_pred, input_length)[0]
+
+    return video, result
 
 if __name__ == '__main__':
 
