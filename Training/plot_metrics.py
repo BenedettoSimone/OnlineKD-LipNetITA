@@ -68,10 +68,17 @@ def plot_val_metrics_kd(run_name):
     wer1 = metrics_file1['Mean WER (Norm)']
     cer1 = metrics_file1['Mean CER (Norm)']
 
+    #min_wer_index = wer.idxmin()
+    #min_wer_value = wer.min()
+
     plt.plot(wer, color='green')
     plt.plot(cer, color='orange')
     plt.plot(wer1, color='blue')
     plt.plot(cer1, color='red')
+
+    #plt.grid(True)
+    #plt.axhline(min_wer_value, color='green', linestyle='--')
+    #plt.axvline(min_wer_index, color='green', linestyle='--')
 
     plt.ylabel('Value')
     plt.xlabel('Epoch')
@@ -81,12 +88,35 @@ def plot_val_metrics_kd(run_name):
     plt.close()
 
 
+def plot_train_metrics_kd(run_name):
+    metrics_file = pd.read_csv(f'results/{run_name}/training_metrics.csv')
+
+    l0 = metrics_file['Loss student 0']
+    l1 = metrics_file['Loss student 1']
+    el = metrics_file['Ensemble loss']
+    ml = metrics_file['Multiloss value']
+
+    plt.plot(l0, color='green')
+    plt.plot(l1, color='orange')
+    plt.plot(el, color='blue')
+    plt.plot(ml, color='red')
+
+    plt.ylabel('Value')
+    plt.xlabel('Epoch')
+    plt.legend(['Loss 0', 'Loss 1', 'Ensemble loss', 'Multiloss'], loc='upper left')
+    #plt.show()
+    plt.savefig(f"plots/{run_name}/training_metrics.jpg")
+    plt.close()
+
 
 if __name__ == '__main__':
     # Vanilla Training
     #run_name = "2023_10_26_09_22_27"
     #run_name = "2023_10_28_11_30_29"
-    run_name = "2023_10_31_18_23_34"
+    #run_name = "2023_10_31_18_23_34"
+    #run_name = "2023_11_02_10_55_00"
+    run_name = "2023_11_04_16_41_41"
+
 
     if not os.path.exists("plots"):
         os.mkdir("plots")
@@ -95,7 +125,8 @@ if __name__ == '__main__':
     if not os.path.exists(run_folder):
         os.mkdir(run_folder)
 
-    #plot_losses(run_name)
-    #plot_val_metrics(run_name)
-    plot_losses_kd(run_name)
-    plot_val_metrics_kd(run_name)
+    plot_losses(run_name)
+    plot_val_metrics(run_name)
+    #plot_losses_kd(run_name)
+    #plot_val_metrics_kd(run_name)
+    #plot_train_metrics_kd(run_name)
