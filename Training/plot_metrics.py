@@ -68,8 +68,8 @@ def plot_val_metrics_kd(run_name):
     wer1 = metrics_file1['Mean WER (Norm)']
     cer1 = metrics_file1['Mean CER (Norm)']
 
-    #min_wer_index = wer.idxmin()
-    #min_wer_value = wer.min()
+    min_wer_index = wer.idxmin()
+    min_wer_value = wer.min()
 
     plt.plot(wer, color='green')
     plt.plot(cer, color='orange')
@@ -115,7 +115,8 @@ if __name__ == '__main__':
     #run_name = "2023_10_28_11_30_29"
     #run_name = "2023_10_31_18_23_34"
     #run_name = "2023_11_02_10_55_00"
-    run_name = "2023_11_04_16_41_41"
+    #run_name = "2023_11_04_16_41_41"
+    run_name = "2023_11_06_17_36_26"
 
 
     if not os.path.exists("plots"):
