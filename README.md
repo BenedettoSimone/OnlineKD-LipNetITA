@@ -10,16 +10,12 @@ This repository is dedicated to my Master's thesis project, in which I will impl
 **Reference**: this project use a previous implementation of LipNet with an Italian dataset [[4](https://github.com/BenedettoSimone/Lipnet-ITA)]. Please follow the instructions in this repository to use the new updated version of LipNet.
 
 ## Prerequisites
-- Python 3.6.6
+- Python 3.10
 - [ffmpeg](https://www.ffmpeg.org)
 
 ## 1. Getting started
-In this section, we will first examine how to install and run the vanilla version of LipNet. Next, we will explore the version with Online KD.
 
-
-### 1.1 Usage
-
-To use the model, first you need to clone the repository:
+First you need to clone the repository:
 ```
 https://github.com/BenedettoSimone/OnlineKD-LipNetITA
 ```
@@ -30,7 +26,6 @@ cd OnlineKD-LipNetITA/
 pip install -e .
 ```
 
-
 Next, install the requirements:
 
 ```
@@ -38,17 +33,8 @@ pip install -r requirements.txt
 ```
 If an error occurs when installing the dlib package, install cmake.
 
-<br>
-
-If you have some issue, please follow the list of requirements showed in the following images:
-
-<p align="center"><img src="./readme_images/req1.png"/></p>
-<p align="center"><img src="./readme_images/req2.png"/></p>
-<p align="center"><img src="./readme_images/req3.png"/></p>
-
-
 ## 2. Dataset ITA
-This section will explain the process used to create the Italian dataset. If you want to do your own or use pre-trained weights to do lipreading go to section 3.
+This section will explain the process used to create the Italian dataset. _You can skip this section if you do not want to build a custom dataset._
 
 ### 2.1 Sentences
 An Italian dataset containing the following sentences was used in this project.
@@ -165,11 +151,27 @@ Next, in the section ``Training with Knowledge Distillation`` we will explore ho
 
 If you are using a new dataset, please refer to the FAQ section to change the parameters.
 
+The next table shows the details of the trainings carried out.
+
+|        Training         |           Details            |
+|:-----------------------:|:----------------------------:|
+|   2023_10_26_09_22_27   | LipNet vanilla 32 batch size |
+|   2023_10_28_11_30_29   |    LipNet-128 vanilla 32b    |
+|   2023_10_31_18_23_34   |        LipNet kd 16b         |
+|   2023_11_02_10_55_00   |    LipNet-256 vanilla 32b    |
+|   2023_11_04_16_41_41   |      LipNet vanilla 16b      |
+|   2023_11_06_17_35_37   |    LipNet-256 vanilla 16b    |
+|   2023_11_06_17_36_26   |    LipNet-128 vanilla 16b    |
+
+
+
 ### 3.1 Training Vanilla
+To train vanilla models use the ``Training/train.py`` script. You can find the different models in ``Lipnet/model.py``,``Lipnet/model2.py``,``Lipnet/model3.py``.
+
+_N.B. before running vanilla training, disable the ``on_batch_end`` method in ``Lipnet/callbacks.py``._
 
 ### 3.1 Training with Knowledge Distillation
-
-
+To train the models use the ``Training/train_KD.py`` script.
 
 ## FAQ
 <details>
