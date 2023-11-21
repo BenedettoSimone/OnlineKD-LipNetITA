@@ -55,9 +55,9 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
             start_file_w = os.path.join(OUTPUT_DIR, 'startWeight/unseen-weights178.h5')
             lipnet.model.load_weights(start_file_w)
 
-        # load preexisting trained weights for the model
+        # load preexisting trained weights for the model weights113_peer_01.h5
         if start_epoch > 0:
-            weight_file = os.path.join(OUTPUT_DIR, os.path.join(run_name, 'weights%02d.h5' % (start_epoch - 1)))
+            weight_file = os.path.join(OUTPUT_DIR, os.path.join(f"2023_10_31_17_06_50/s{n}", f'weights%02d_peer_0{n}.h5' % (start_epoch - 1)))
             lipnet.model.load_weights(weight_file)
 
         adam = tf.keras.optimizers.Adam(learning_rate=0.0001, beta_1=0.9, beta_2=0.999, epsilon=1e-08)
@@ -220,7 +220,7 @@ if __name__ == '__main__':
     run_name = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
 
     start_epoch = 0
-    stop_epoch = 100
+    stop_epoch = 340
 
     # Samples properties
     img_c = 3  # Image channels
@@ -230,7 +230,7 @@ if __name__ == '__main__':
 
     absolute_max_string_len = 54  # Max sentence length
 
-    minibatch_size = 32  # Minibatch size
+    minibatch_size = 16  # Minibatch size
 
     num_samples_stats = 95  # Number of samples for statistics evaluation per epoch
 

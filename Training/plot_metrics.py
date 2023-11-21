@@ -31,14 +31,20 @@ def plot_val_metrics(run_name):
     plt.plot(cer, color='orange')
 
     min_wer_index = wer.idxmin()
-    min_cer_index = cer.idxmin()
+    #min_cer_index = cer.idxmin()
     min_wer_value = wer[min_wer_index]
-    min_cer_value = cer[min_cer_index]
+    min_cer_value = cer[min_wer_index]
 
+
+    '''legend1 = plt.legend(
+        [f'Min WER: {min_wer_value:.2f} (Epoch {min_wer_index})',
+         f'Min CER: {min_cer_value:.2f} (Epoch {min_cer_index})'],
+        loc='upper right'
+    )'''
 
     legend1 = plt.legend(
         [f'Min WER: {min_wer_value:.2f} (Epoch {min_wer_index})',
-         f'Min CER: {min_cer_value:.2f} (Epoch {min_cer_index})'],
+         f'CER: {min_cer_value:.2f} (Epoch {min_wer_index})'],
         loc='upper right'
     )
 
@@ -91,20 +97,33 @@ def plot_val_metrics_kd(run_name):
     plt.plot(cer1, color='red')
 
     min_wer_index = wer.idxmin()
-    min_cer_index = cer.idxmin()
+    #min_cer_index = cer.idxmin()
     min_wer1_index = wer1.idxmin()
-    min_cer1_index = cer1.idxmin()
+    #min_cer1_index = cer1.idxmin()
+
+    #min_wer_value = wer[min_wer_index]
+    #min_cer_value = cer[min_cer_index]
+    #min_wer1_value = wer1[min_wer1_index]
+    #min_cer1_value = cer1[min_cer1_index]
 
     min_wer_value = wer[min_wer_index]
-    min_cer_value = cer[min_cer_index]
+    cer_value = cer[min_wer_index]
     min_wer1_value = wer1[min_wer1_index]
-    min_cer1_value = cer1[min_cer1_index]
+    cer1_value = cer1[min_wer1_index]
 
-    legend1 = plt.legend(
+    '''legend1 = plt.legend(
         [f'Min WER: {min_wer_value:.2f} (Epoch {min_wer_index})',
          f'Min CER: {min_cer_value:.2f} (Epoch {min_cer_index})',
          f'Min WER1: {min_wer1_value:.2f} (Epoch {min_wer1_index})',
          f'Min CER1: {min_cer1_value:.2f} (Epoch {min_cer1_index})'],
+        loc='upper right'
+    )'''
+
+    legend1 = plt.legend(
+        [f'Min WER_s0: {min_wer_value:.2f} (Epoch {min_wer_index})',
+         f'CER_s0: {cer_value:.2f} (Epoch {min_wer_index})',
+         f'Min WER_s1: {min_wer1_value:.2f} (Epoch {min_wer1_index})',
+         f'CER_s1: {cer1_value:.2f} (Epoch {min_wer1_index})'],
         loc='upper right'
     )
 
@@ -112,7 +131,7 @@ def plot_val_metrics_kd(run_name):
 
     plt.ylabel('Value')
     plt.xlabel('Epoch')
-    legend2 = plt.legend(['WER', 'CER', 'WER1', 'CER1'], loc='upper left')
+    legend2 = plt.legend(['WER_s0', 'CER_s0', 'WER_s1', 'CER_s1'], loc='upper left')
 
     plt.gca().add_artist(legend1)
 
@@ -149,13 +168,13 @@ if __name__ == '__main__':
     #run_name = ("2023_10_28_11_30_29", False)
 
     # KD Training 16bs
-    #run_name = ("2023_10_31_18_23_34", True)
+    run_name = ("2023_10_31_18_23_34", True)
 
     # Vanilla Training-256 32bs
     #run_name = ("2023_11_02_10_55_00", False)
 
     # Vanilla Training 16bs
-    run_name = ("2023_11_04_16_41_41", False)
+    #run_name = ("2023_11_04_16_41_41", False)
 
     # Vanilla Training-256 16bs
     #run_name = ("2023_11_06_17_35_37", False)

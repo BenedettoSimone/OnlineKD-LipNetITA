@@ -133,25 +133,25 @@ def kd_loss(student_logits, ensemble_output, temperature):
             kl_values, sum_kl = kl_divergence(ensemble_output_i, logits_i)
             kl_values_batch.append(sum_kl)
             # Use to show scatter plot
-            # kl_values_batch.append(kl_values)
+            #kl_values_batch.append(kl_values)
 
         # kl_values batch contains the kl value for each sample
         students_kl.append(temperature**2 * kl_values_batch)
-        '''
-        # Create a scatter plot for each array
+
+        '''# Create a scatter plot for each array
         for i, values in enumerate(kl_values_batch):
             # New plot for each kl_set
             plt.figure(i)
 
-            plt.scatter(range(len(values)), values, label=f'Sample {i + 1}')
+            plt.scatter(range(len(values)), values)
 
-            plt.title(f'Scatter plot for sample {i + 1}')
-            plt.xlabel('Index')
+            #plt.title(f'Scatter plot for sample {i + 1}')
+            plt.xlabel('Frame index')
             plt.ylabel('Value')
-            plt.legend()
-            plt.savefig("kl_div_"+str(i)+".jpg")                
-            plt.close()
-        '''
+            #plt.legend()
+            plt.savefig("kl_div_"+str(i)+f"s{student_idx}.jpg")
+            plt.close()'''
+
     return students_kl
 
 

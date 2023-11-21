@@ -51,12 +51,12 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
 
     # load weights
     if start_epoch == 0:
-        start_file_w = os.path.join(OUTPUT_DIR, 'startWeight/unseen-weights178.h5')
+        start_file_w = os.path.join(OUTPUT_DIR, 'startWeight/weights99_peer_01.h5')
         lipnet.model.load_weights(start_file_w)
 
     # load preexisting trained weights for the model
     if start_epoch > 0:
-        weight_file = os.path.join(OUTPUT_DIR, os.path.join(run_name, 'weights%02d.h5' % (start_epoch - 1)))
+        weight_file = os.path.join(OUTPUT_DIR, os.path.join("2023_10_28_14_28_20", 'weights%02d.h5' % (start_epoch - 1)))
         lipnet.model.load_weights(weight_file)
     
 
@@ -87,6 +87,7 @@ def train(run_name, start_epoch, stop_epoch, img_c, img_w, img_h, frames_n, abso
 if __name__ == '__main__':
     run_name = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
 
+
     start_epoch = 0
     stop_epoch = 100
 
@@ -98,7 +99,7 @@ if __name__ == '__main__':
 
     absolute_max_string_len = 54  # Max sentence length
 
-    minibatch_size = 32  # Minibatch size
+    minibatch_size = 16  # Minibatch size
 
     num_samples_stats = 95  # Number of samples for statistics evaluation per epoch
 

@@ -73,7 +73,6 @@ class Statistics(tf.keras.callbacks.Callback):
         mean_bleu, mean_bleu_norm = self.get_mean_bleu_score(data)
 
         # Compute the mean CTC loss
-        # TODO check mean
         validation_loss = np.mean(val_ctc_losses)
 
         return {
@@ -137,7 +136,7 @@ class Statistics(tf.keras.callbacks.Callback):
                  "Mean BLEU (Norm)"])
 
 
-    '''
+
     def on_batch_end(self, y_pred, batch, logs=None):
         """
         Callback called at the end of each batch during model training to save batch results for KD attention.
@@ -158,7 +157,7 @@ class Statistics(tf.keras.callbacks.Callback):
         bleu_scores = self.get_bleu_scores(batch_results)
 
         return cer_values, wer_values, bleu_scores
-    '''
+
 
 
     def on_epoch_end(self, epoch, logs={}):
