@@ -153,15 +153,15 @@ If you are using a new dataset, please refer to the FAQ section to change the pa
 
 The next table shows the details of the trainings carried out.
 
-|        Training         |           Details            |
-|:-----------------------:|:----------------------------:|
-|   2023_10_26_09_22_27   | LipNet vanilla 32 batch size |
-|   2023_10_28_11_30_29   |    LipNet-128 vanilla 32b    |
-|   2023_10_31_18_23_34   |        LipNet kd 16b         |
-|   2023_11_02_10_55_00   |    LipNet-256 vanilla 32b    |
-|   2023_11_04_16_41_41   |      LipNet vanilla 16b      |
-|   2023_11_06_17_35_37   |    LipNet-256 vanilla 16b    |
-|   2023_11_06_17_36_26   |    LipNet-128 vanilla 16b    |
+|        Training         |           Details            | Best model                |
+|:-----------------------:|:----------------------------:|---------------------------|
+|   2023_10_26_09_22_27   | LipNet vanilla 32 batch size | V32_weights567            |
+|   2023_10_28_11_30_29   |    LipNet-128 vanilla 32b    | N/A                       |
+|   2023_10_31_18_23_34   |        LipNet kd 16b         | KD16_weights590_peer_00, KD16_weights545_peer_01 |
+|   2023_11_02_10_55_00   |    LipNet-256 vanilla 32b    | N/A                       |
+|   2023_11_04_16_41_41   |      LipNet vanilla 16b      | V16_weights598            |
+|   2023_11_06_17_35_37   |    LipNet-256 vanilla 16b    | N/A                       |
+|   2023_11_06_17_36_26   |    LipNet-128 vanilla 16b    | N/A                       |
 
 
 
